@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Scholarly Curator - Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-tertiary": "#fef7ff",
+                        "primary-fixed-dim": "#c2d4ff",
+                        "tertiary-container": "#a478f7",
+                        "inverse-on-surface": "#9b9d9e",
+                        "on-error": "#fff7f6",
+                        "primary-container": "#d8e2ff",
+                        "surface-container-low": "#f1f4f6",
+                        "inverse-primary": "#4a8eff",
+                        "on-secondary-fixed": "#264350",
+                        "on-background": "#2b3437",
+                        "surface-dim": "#d1dce0",
+                        "error-container": "#fe8983",
+                        "surface-variant": "#dbe4e7",
+                        "outline-variant": "#abb3b7",
+                        "on-tertiary-fixed": "#000000",
+                        "surface-tint": "#005bc0",
+                        "secondary-fixed-dim": "#bbd9e9",
+                        "tertiary-fixed-dim": "#966be9",
+                        "on-error-container": "#752121",
+                        "on-primary-fixed": "#003d85",
+                        "inverse-surface": "#0c0f10",
+                        "surface-bright": "#f8f9fa",
+                        "on-surface-variant": "#586064",
+                        "on-tertiary-fixed-variant": "#26005a",
+                        "surface-container-highest": "#dbe4e7",
+                        "on-secondary-container": "#395663",
+                        "tertiary-fixed": "#a478f7",
+                        "on-primary-container": "#004fa8",
+                        "secondary-fixed": "#c9e7f7",
+                        "on-surface": "#2b3437",
+                        "on-secondary": "#f3faff",
+                        "on-secondary-fixed-variant": "#435f6d",
+                        "secondary-container": "#c9e7f7",
+                        "surface-container-lowest": "#ffffff",
+                        "error": "#9f403d",
+                        "tertiary-dim": "#6436b4",
+                        "primary": "#005bc0",
+                        "primary-dim": "#004fa9",
+                        "error-dim": "#4e0309",
+                        "surface-container-high": "#e3e9ec",
+                        "on-primary-fixed-variant": "#0058ba",
+                        "on-primary": "#f7f7ff"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8f9fa;
+        }
+        h1, h2, h3, .font-headline {
+            font-family: 'Manrope', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface antialiased flex flex-col min-h-screen">
+<nav class="bg-slate-50 dark:bg-slate-950 docked full-width top-0 sticky z-50 border-none bg-slate-50/80 backdrop-blur-md dark:bg-slate-950/80 flat no shadows">
+<div class="flex justify-between items-center w-full px-6 py-3">
+<div class="flex items-center gap-8">
+<span class="text-xl font-bold tracking-tight text-blue-700 dark:text-blue-400 font-manrope">The Scholarly Curator</span>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex items-center bg-surface-container rounded-full px-4 py-1.5 gap-2">
+<span class="material-symbols-outlined text-on-surface-variant text-sm" data-icon="search">search</span>
+<input class="bg-transparent border-none focus:ring-0 text-sm w-48 font-body" placeholder="Search research..." type="text"/>
+</div>
+<div class="flex items-center gap-2">
+<button class="p-2 text-slate-500 hover:bg-slate-200/50 dark:hover:bg-slate-800/50 rounded-full transition-colors">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="h-8 w-8 rounded-full bg-primary-container flex items-center justify-center overflow-hidden ml-2">
+<img alt="User profile avatar" data-alt="User avatar profile picture circular icon" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDijsQ2y2euf2JSSpx8E6IrQ7LZBl_vwk0pkWjWTttPzQvonRAwnCMEcOLO9QCjduXlbpq5DwFR-H8RDPrlQzPz0wDazCbGN19POSArhwFzFeYMl5nRZo0-VZjVaCxSKFzYjwsEbD0fu-0U3ln0MouWUGh4mu9DropSQByAR8tSv1SmdaiDiKeNyHWEFQqW_-uXQ8MApEMMuAlVjegCjhoWRMHvqkjSpyES8ZGpufSn3AUc85_RFdQIO9T0xJve79Q-uyXs9xIM4RPg"/>
+</div>
+</div>
+</div>
+</div>
+</nav>
+<main class="max-w-7xl mx-auto px-6 py-12 flex-grow w-full">
+<header class="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+<div>
+<h1 class="text-4xl font-extrabold tracking-tight text-on-surface mb-2">Research Studio</h1>
+<p class="text-on-surface-variant text-lg max-w-xl">Organize your intellectual output with editorial precision. Select a notebook to continue your discovery.</p>
+</div>
+<button class="bg-gradient-to-br from-primary to-primary-dim text-on-primary px-8 py-4 rounded-xl font-semibold shadow-lg shadow-primary/10 hover:shadow-primary/20 transition-all flex items-center gap-3 active:scale-95">
+<span class="material-symbols-outlined" data-icon="add_circle">add_circle</span>
+<span>Create New Notebook</span>
+</button>
+</header>
+<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
+<div class="group relative bg-surface-container-lowest rounded-xl p-8 transition-all hover:shadow-2xl hover:shadow-on-surface/5 flex flex-col min-h-[280px]">
+<div class="absolute top-6 right-6">
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-surface-container rounded-lg">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+<div class="mb-6">
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full">HISTORICAL ANALYSIS</span>
+</div>
+<h3 class="text-2xl font-bold text-on-surface mb-4 leading-tight group-hover:text-primary transition-colors">The Impact of Renaissance Humanism on Modern Education</h3>
+<div class="mt-auto pt-6 flex items-center justify-between border-t border-outline-variant/10">
+<div class="flex items-center gap-2 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-sm" data-icon="description">description</span>
+<span>12 Sources</span>
+</div>
+<span class="text-on-surface-variant text-xs font-medium">Updated Oct 24, 2023</span>
+</div>
+</div>
+<div class="group relative bg-surface-container-lowest rounded-xl p-8 transition-all hover:shadow-2xl hover:shadow-on-surface/5 flex flex-col min-h-[280px]">
+<div class="absolute top-6 right-6">
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-surface-container rounded-lg">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+<div class="mb-6">
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full">NEUROSCIENCE</span>
+</div>
+<h3 class="text-2xl font-bold text-on-surface mb-4 leading-tight group-hover:text-primary transition-colors">Neural Plasticity in Adult Language Acquisition</h3>
+<div class="mt-auto pt-6 flex items-center justify-between border-t border-outline-variant/10">
+<div class="flex items-center gap-2 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-sm" data-icon="description">description</span>
+<span>8 Sources</span>
+</div>
+<span class="text-on-surface-variant text-xs font-medium">Updated Nov 02, 2023</span>
+</div>
+</div>
+<div class="group relative bg-surface-container-lowest rounded-xl p-8 transition-all hover:shadow-2xl hover:shadow-on-surface/5 flex flex-col min-h-[280px]">
+<div class="absolute top-6 right-6">
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-surface-container rounded-lg">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+<div class="mb-6">
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full">ETHICS &amp; AI</span>
+</div>
+<h3 class="text-2xl font-bold text-on-surface mb-4 leading-tight group-hover:text-primary transition-colors">Algorithmic Bias in Predictive Policing Systems</h3>
+<div class="mt-auto pt-6 flex items-center justify-between border-t border-outline-variant/10">
+<div class="flex items-center gap-2 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-sm" data-icon="description">description</span>
+<span>24 Sources</span>
+</div>
+<span class="text-on-surface-variant text-xs font-medium">Updated Oct 12, 2023</span>
+</div>
+</div>
+<div class="group relative bg-surface-container-lowest rounded-xl p-8 transition-all hover:shadow-2xl hover:shadow-on-surface/5 flex flex-col min-h-[280px]">
+<div class="absolute top-6 right-6">
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-surface-container rounded-lg">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+<div class="mb-6">
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full">ECONOMICS</span>
+</div>
+<h3 class="text-2xl font-bold text-on-surface mb-4 leading-tight group-hover:text-primary transition-colors">Decentralized Finance: Risks and Market Efficiency</h3>
+<div class="mt-auto pt-6 flex items-center justify-between border-t border-outline-variant/10">
+<div class="flex items-center gap-2 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-sm" data-icon="description">description</span>
+<span>5 Sources</span>
+</div>
+<span class="text-on-surface-variant text-xs font-medium">Updated Nov 15, 2023</span>
+</div>
+</div>
+<div class="group relative bg-surface-container-lowest rounded-xl p-8 transition-all hover:shadow-2xl hover:shadow-on-surface/5 flex flex-col min-h-[280px]">
+<div class="absolute top-6 right-6">
+<button class="text-on-surface-variant opacity-0 group-hover:opacity-100 transition-opacity p-2 hover:bg-surface-container rounded-lg">
+<span class="material-symbols-outlined" data-icon="more_vert">more_vert</span>
+</button>
+</div>
+<div class="mb-6">
+<span class="bg-tertiary-container text-on-tertiary-container text-[10px] font-bold tracking-widest uppercase px-2 py-0.5 rounded-full">PHILOSOPHY</span>
+</div>
+<h3 class="text-2xl font-bold text-on-surface mb-4 leading-tight group-hover:text-primary transition-colors">Stoicism in the Age of Digital Distraction</h3>
+<div class="mt-auto pt-6 flex items-center justify-between border-t border-outline-variant/10">
+<div class="flex items-center gap-2 text-on-surface-variant text-sm">
+<span class="material-symbols-outlined text-sm" data-icon="description">description</span>
+<span>19 Sources</span>
+</div>
+<span class="text-on-surface-variant text-xs font-medium">Updated Yesterday</span>
+</div>
+</div>
+<div class="group border-2 border-dashed border-outline-variant/30 rounded-xl p-8 transition-all hover:border-primary/50 flex flex-col items-center justify-center text-center gap-4 cursor-pointer min-h-[280px] bg-transparent">
+<div class="w-16 h-16 rounded-full bg-surface-container-high flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined text-3xl" data-icon="note_add">note_add</span>
+</div>
+<div>
+<h4 class="font-bold text-lg text-on-surface">New Research Project</h4>
+<p class="text-on-surface-variant text-sm max-w-[200px]">Create a blank workspace to start collecting sources.</p>
+</div>
+</div>
+</section>
+</main>
+</body></html>

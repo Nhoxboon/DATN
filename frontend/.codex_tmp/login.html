@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Login | Scholar Script</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-background": "#2b3437",
+                    "tertiary": "#7044c1",
+                    "tertiary-container": "#a478f7",
+                    "surface-dim": "#d1dce0",
+                    "tertiary-fixed-dim": "#966be9",
+                    "on-surface-variant": "#586064",
+                    "surface-container-high": "#e3e9ec",
+                    "primary": "#005bc0",
+                    "primary-dim": "#004fa9",
+                    "primary-container": "#d8e2ff",
+                    "on-secondary-fixed-variant": "#435f6d",
+                    "on-primary": "#f7f7ff",
+                    "on-primary-container": "#004fa8",
+                    "on-secondary": "#f3faff",
+                    "surface-container": "#eaeff1",
+                    "on-surface": "#2b3437",
+                    "on-secondary-container": "#395663",
+                    "error": "#9f403d",
+                    "inverse-on-surface": "#9b9d9e",
+                    "secondary-container": "#c9e7f7",
+                    "on-tertiary-fixed-variant": "#26005a",
+                    "error-dim": "#4e0309",
+                    "on-tertiary-fixed": "#000000",
+                    "background": "#f8f9fa",
+                    "secondary-dim": "#3a5764",
+                    "tertiary-dim": "#6436b4",
+                    "surface-container-low": "#f1f4f6",
+                    "primary-fixed-dim": "#c2d4ff",
+                    "error-container": "#fe8983",
+                    "surface-tint": "#005bc0",
+                    "on-primary-fixed-variant": "#0058ba",
+                    "surface-bright": "#f8f9fa",
+                    "surface": "#f8f9fa",
+                    "tertiary-fixed": "#a478f7",
+                    "secondary-fixed": "#c9e7f7",
+                    "surface-container-highest": "#dbe4e7",
+                    "on-tertiary": "#fef7ff",
+                    "outline-variant": "#abb3b7",
+                    "on-tertiary-container": "#16003a",
+                    "on-secondary-fixed": "#264350",
+                    "inverse-surface": "#0c0f10",
+                    "inverse-primary": "#4a8eff",
+                    "secondary-fixed-dim": "#bbd9e9",
+                    "on-primary-fixed": "#003d85",
+                    "secondary": "#466370",
+                    "primary-fixed": "#d8e2ff",
+                    "on-error-container": "#752121",
+                    "on-error": "#fff7f6",
+                    "outline": "#737c7f",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-variant": "#dbe4e7"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "fontFamily": {
+                    "headline": ["Manrope"],
+                    "body": ["Inter"],
+                    "label": ["Inter"]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; }
+        h1, h2, h3, .font-headline { font-family: 'Manrope', sans-serif; }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        /* Custom ghost border for inputs */
+        .ghost-border {
+            outline: 1px solid rgba(171, 179, 183, 0.15);
+        }
+    </style>
+</head>
+<body class="bg-surface text-on-surface flex items-center justify-center min-h-screen p-6">
+<!-- Auth Container -->
+<main class="w-full max-w-md">
+<!-- Floating Glassmorphism Effect Background -->
+<div class="relative">
+<!-- Decorative blur background elements -->
+<div class="absolute -top-24 -left-24 w-64 h-64 bg-primary/5 rounded-full blur-3xl"></div>
+<div class="absolute -bottom-24 -right-24 w-64 h-64 bg-tertiary/5 rounded-full blur-3xl"></div>
+<!-- Login Card -->
+<div class="relative bg-surface-container-lowest rounded-xl shadow-[0_8px_32px_rgba(43,52,55,0.06)] overflow-hidden">
+<div class="p-8 md:p-12">
+<!-- Identity Section -->
+<div class="text-center mb-10">
+<div class="inline-flex items-center justify-center w-12 h-12 bg-surface-container-high rounded-lg mb-4">
+<span class="material-symbols-outlined text-primary text-3xl" data-icon="menu_book">menu_book</span>
+</div>
+<h1 class="text-2xl font-extrabold tracking-tight text-on-surface font-headline mb-1">Scholar Script</h1>
+<p class="text-on-surface-variant font-medium text-sm tracking-wide opacity-80">The Digital Atelier</p>
+</div>
+<!-- Auth Form -->
+<form class="space-y-6">
+<div class="space-y-4">
+<!-- Email Field -->
+<div>
+<label class="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider mb-2 ml-1" for="email">Email Address</label>
+<div class="relative">
+<input class="w-full bg-surface-container-low border-none ghost-border rounded-lg px-4 py-3 text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/20 transition-all outline-none" id="email" name="email" placeholder="scholar@atelier.com" type="email"/>
+</div>
+</div>
+<!-- Password Field -->
+<div>
+<div class="flex justify-between items-center mb-2 ml-1">
+<label class="block text-xs font-semibold text-on-surface-variant uppercase tracking-wider" for="password">Password</label>
+<a class="text-xs font-medium text-primary hover:text-primary-dim transition-colors" href="#">Forgot password?</a>
+</div>
+<div class="relative">
+<input class="w-full bg-surface-container-low border-none ghost-border rounded-lg px-4 py-3 text-on-surface placeholder:text-on-surface-variant/50 focus:ring-2 focus:ring-primary/20 transition-all outline-none" id="password" name="password" placeholder="••••••••" type="password"/>
+</div>
+</div>
+</div>
+<!-- Submit Button -->
+<button class="w-full bg-gradient-to-br from-primary to-primary-dim text-on-primary font-semibold py-3.5 rounded-lg shadow-md hover:shadow-lg active:scale-[0.98] transition-all duration-200 font-headline" type="submit">
+                            Sign In
+                        </button>
+<!-- Divider -->
+<div class="relative flex items-center py-2">
+<div class="flex-grow border-t border-outline-variant/15"></div>
+<span class="flex-shrink mx-4 text-[10px] font-bold text-on-surface-variant/40 uppercase tracking-[0.2em]">or continue with</span>
+<div class="flex-grow border-t border-outline-variant/15"></div>
+</div>
+<!-- Social Login -->
+<button class="w-full flex items-center justify-center gap-3 bg-surface-container-highest text-on-surface font-medium py-3 rounded-lg hover:bg-surface-dim transition-colors active:scale-[0.98] duration-200" type="button">
+<img alt="Google Logo" class="w-5 h-5" data-alt="Official Google 'G' icon with multi-colored segments on a clean transparent background" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAlCi3PhhZ3RQVhEaWLyMl0EoCkdY6J63SLMKh-Pe-z_ElZbbNLggD6AAreBeAOYTORmbxaIaCEgPzuyj4DZmL-G9RpSUr3vA2W9A809eRnit0hxJdjhjBfS2F34R7wWBLqu-50682l87lHEo3Av5IZ0pBM9nQ414czbcn9Rstqly2Pqii68qKQZg5mlAEXl7d2DDqTL2L2mj9NkKVN8lYPvyUNQRYDyBW5oa-9TnffQASXaOOAcx9WZUqR_-5rsWIvecrs14M3Rsw3"/>
+<span>Sign in with Google</span>
+</button>
+</form>
+</div>
+<!-- Footer Link -->
+<div class="bg-surface-container-low py-6 px-8 text-center">
+<p class="text-sm text-on-surface-variant">
+                        Don't have an account? 
+                        <a class="text-primary font-bold hover:underline ml-1" href="#">Sign up</a>
+</p>
+</div>
+</div>
+<!-- Page Footer Meta -->
+<footer class="mt-12 text-center">
+<p class="text-[10px] font-headline font-bold uppercase tracking-[0.25em] text-on-surface-variant/40">
+                    © 2024 Scholar Script. Designed for the Digital Atelier.
+                </p>
+<div class="flex justify-center gap-6 mt-4">
+<a class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 hover:text-on-surface transition-colors" href="#">Privacy</a>
+<a class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 hover:text-on-surface transition-colors" href="#">Terms</a>
+<a class="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/50 hover:text-on-surface transition-colors" href="#">Support</a>
+</div>
+</footer>
+</div>
+</main>
+<!-- Visual Background Texture (Subtle Grain/Depth) -->
+<div class="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
+<div class="absolute top-[10%] left-[5%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px]"></div>
+<div class="absolute bottom-[10%] right-[5%] w-[30%] h-[30%] bg-tertiary/5 rounded-full blur-[100px]"></div>
+</div>
+</body></html>

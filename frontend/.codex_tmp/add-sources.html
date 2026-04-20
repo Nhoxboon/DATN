@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&amp;family=Inter:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "on-tertiary": "#fef7ff",
+                        "primary-fixed-dim": "#c2d4ff",
+                        "tertiary-container": "#a478f7",
+                        "inverse-on-surface": "#9b9d9e",
+                        "on-error": "#fff7f6",
+                        "primary-container": "#d8e2ff",
+                        "surface-container-low": "#f1f4f6",
+                        "inverse-primary": "#4a8eff",
+                        "on-secondary-fixed": "#264350",
+                        "on-background": "#2b3437",
+                        "surface-dim": "#d1dce0",
+                        "error-container": "#fe8983",
+                        "surface-variant": "#dbe4e7",
+                        "outline-variant": "#abb3b7",
+                        "on-tertiary-fixed": "#000000",
+                        "surface-tint": "#005bc0",
+                        "secondary-fixed-dim": "#bbd9e9",
+                        "tertiary-fixed-dim": "#966be9",
+                        "on-error-container": "#752121",
+                        "on-primary-fixed": "#003d85",
+                        "inverse-surface": "#0c0f10",
+                        "surface-bright": "#f8f9fa",
+                        "on-surface-variant": "#586064",
+                        "on-tertiary-fixed-variant": "#26005a",
+                        "surface-container-highest": "#dbe4e7",
+                        "on-secondary-container": "#395663",
+                        "tertiary-fixed": "#a478f7",
+                        "on-primary-container": "#004fa8",
+                        "secondary-fixed": "#c9e7f7",
+                        "on-surface": "#2b3437",
+                        "on-secondary": "#f3faff",
+                        "on-secondary-fixed-variant": "#435f6d",
+                        "secondary-container": "#c9e7f7",
+                        "surface-container-lowest": "#ffffff",
+                        "error": "#9f403d",
+                        "tertiary-dim": "#6436b4",
+                        "primary": "#005bc0",
+                        "primary-fixed": "#d8e2ff",
+                        "secondary-dim": "#3a5764",
+                        "outline": "#737c7f",
+                        "surface": "#f8f9fa",
+                        "on-tertiary-container": "#16003a",
+                        "secondary": "#466370",
+                        "surface-container": "#eaeff1",
+                        "background": "#f8f9fa",
+                        "tertiary": "#7044c1",
+                        "primary-dim": "#004fa9",
+                        "error-dim": "#4e0309",
+                        "surface-container-high": "#e3e9ec",
+                        "on-primary-fixed-variant": "#0058ba",
+                        "on-primary": "#f7f7ff"
+                    },
+                    fontFamily: {
+                        "headline": ["Manrope"],
+                        "body": ["Inter"],
+                        "label": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem"},
+                },
+            },
+        }
+    </script>
+<style>
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #dadce0;
+            border-radius: 10px;
+        }
+        .citation-badge {
+            font-size: 10px;
+            font-weight: 700;
+            padding: 1px 4px;
+            background: #e8f0fe;
+            color: #1a73e8;
+            border-radius: 4px;
+            margin-left: 2px;
+            vertical-align: super;
+        }
+    </style>
+</head>
+<body class="bg-surface font-body text-on-surface antialiased overflow-hidden">
+<!-- Modal Layer -->
+<div class="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 md:p-12">
+<div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"></div>
+<div class="relative z-[70] w-full max-w-3xl overflow-hidden rounded-xl bg-surface-container-lowest shadow-2xl ring-1 ring-outline-variant/15 flex flex-col max-h-[90vh]">
+<header class="flex items-center justify-between px-8 py-6 bg-surface-container-lowest">
+<div>
+<h2 class="text-2xl font-headline font-bold text-on-surface tracking-tight">Add Sources</h2>
+<p class="text-sm text-on-surface-variant font-medium mt-1">Upload research papers, transcripts, or notes to your workspace.</p>
+</div>
+<button class="p-2 rounded-full hover:bg-surface-container-high text-on-surface-variant transition-colors">
+<span class="material-symbols-outlined" data-icon="close">close</span>
+</button>
+</header>
+<div class="flex-1 overflow-y-auto px-8 pb-8">
+<div class="group relative flex flex-col items-center justify-center border-2 border-dashed border-outline-variant/30 rounded-xl bg-surface-container-low p-12 transition-all hover:border-primary/40 hover:bg-surface-container-lowest">
+<div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-container text-on-primary-container">
+<span class="material-symbols-outlined text-3xl" data-icon="upload_file">upload_file</span>
+</div>
+<div class="text-center">
+<p class="text-lg font-headline font-bold text-on-surface">Drag &amp; drop files here</p>
+<p class="text-sm text-on-surface-variant mt-1">PDF, DOCX, or TXT (Max 50MB per file)</p>
+</div>
+<button class="mt-6 px-6 py-2.5 rounded-full bg-gradient-to-br from-primary to-primary-dim text-on-primary font-semibold text-sm shadow-md hover:shadow-lg transition-all active:scale-95">
+                        Browse Computer
+                    </button>
+</div>
+<div class="mt-10">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-sm font-headline font-bold uppercase tracking-wider text-on-surface-variant">Selected Files (3)</h3>
+<span class="text-xs font-medium text-primary">All files ready</span>
+</div>
+<div class="space-y-3">
+<div class="group flex items-center gap-4 p-4 rounded-xl bg-surface-container-low transition-colors hover:bg-surface-container-high">
+<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-sm text-primary">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<p class="text-sm font-semibold text-on-surface truncate">Cognitive_Architecture_2024.pdf</p>
+<span class="text-xs text-on-surface-variant">1.2 MB</span>
+</div>
+<div class="mt-1.5 h-1 w-full bg-outline-variant/20 rounded-full overflow-hidden">
+<div class="h-full w-full bg-primary rounded-full"></div>
+</div>
+</div>
+<button class="p-1.5 rounded-full text-on-surface-variant hover:bg-error-container/20 hover:text-error transition-all">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+</div>
+<div class="group flex items-center gap-4 p-4 rounded-xl bg-surface-container-low transition-colors hover:bg-surface-container-high">
+<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-sm text-tertiary">
+<span class="material-symbols-outlined" data-icon="article">article</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<p class="text-sm font-semibold text-on-surface truncate">Research_Methods_Draft.docx</p>
+<span class="text-xs text-on-surface-variant">840 KB</span>
+</div>
+<div class="mt-1.5 h-1 w-full bg-outline-variant/20 rounded-full overflow-hidden">
+<div class="h-full w-full bg-primary rounded-full"></div>
+</div>
+</div>
+<button class="p-1.5 rounded-full text-on-surface-variant hover:bg-error-container/20 hover:text-error transition-all">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+</div>
+<div class="group flex items-center gap-4 p-4 rounded-xl bg-surface-container-low transition-colors hover:bg-surface-container-high">
+<div class="flex h-10 w-10 items-center justify-center rounded-lg bg-white shadow-sm text-primary">
+<span class="material-symbols-outlined" data-icon="description">description</span>
+</div>
+<div class="flex-1 min-w-0">
+<div class="flex items-center justify-between">
+<p class="text-sm font-semibold text-on-surface truncate">Interview_Transcript_V2.pdf</p>
+<span class="text-xs text-on-surface-variant">2.1 MB</span>
+</div>
+<div class="mt-1.5 h-1 w-full bg-outline-variant/20 rounded-full overflow-hidden">
+<div class="h-full w-full bg-primary rounded-full"></div>
+</div>
+</div>
+<button class="p-1.5 rounded-full text-on-surface-variant hover:bg-error-container/20 hover:text-error transition-all">
+<span class="material-symbols-outlined text-[20px]" data-icon="delete">delete</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<footer class="px-8 py-6 bg-surface-container-high flex items-center justify-between">
+<div class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]" data-icon="info">info</span>
+<span class="text-xs font-medium">Files will be indexed for AI search automatically.</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="px-5 py-2 rounded-full text-sm font-bold text-on-surface hover:bg-surface-container-highest transition-colors">
+                        Cancel
+                    </button>
+<button class="px-8 py-2 rounded-full bg-gradient-to-br from-primary to-primary-dim text-on-primary font-bold text-sm shadow-md hover:shadow-lg transition-all active:scale-95">
+                        Process Sources
+                    </button>
+</div>
+</footer>
+</div>
+</div>
+<!-- Underlying Content: Notebook Editor & Chat -->
+<div class="min-h-screen flex flex-col pointer-events-none">
+<!-- Top Navigation -->
+<header class="h-14 border-b border-outline-variant flex items-center justify-between px-4 shrink-0 bg-white">
+<div class="flex items-center gap-4">
+<span class="text-lg font-bold text-primary font-headline">The Scholarly Curator</span>
+<div class="h-4 w-px bg-outline-variant mx-1"></div>
+<span class="text-sm font-medium text-secondary truncate max-w-[300px]">Product Development &amp; Design Alignment</span>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold bg-white border border-outline-variant rounded-full">
+<span class="material-symbols-outlined text-lg" data-icon="share">share</span>
+                    Share
+                </button>
+<button class="p-2 text-secondary">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+<div class="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center border border-outline-variant overflow-hidden ml-1">
+<img alt="User profile" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDOLD45SLRHcy8AvEm8nU1YDAcpDx04OidR8XP2LaF-qdeO42iEFzhnACSLPPPGLJnVaiqpk1tiVvme34VSWu9jeQ3iqeUE503iKPe1XiyiQNPIyp8T97OeYNVtW7i9j0m4BodTzzjBvSim-BeHHbYOzE3qygovTIlsTY_hSEqsCT2iqNnKajD9pU9FXugys9U9LWAaJutCOD7JhX3knwsuz3yMeHuffsXLYucE9Ym9w9ZclRN9vAwy7OSN_1CMmwg5fcZLtnuZgm98"/>
+</div>
+</div>
+</header>
+<!-- Main 3-Column Layout -->
+<div class="flex flex-1 overflow-hidden bg-surface">
+<!-- Left Column: Sources -->
+<aside class="w-[280px] flex flex-col border-r border-outline-variant bg-white">
+<div class="p-4 border-b border-outline-variant">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-sm font-bold uppercase tracking-wider text-secondary">Sources</h2>
+<span class="material-symbols-outlined text-secondary" data-icon="dock_to_left">dock_to_left</span>
+</div>
+<button class="w-full py-2.5 rounded-xl border-2 border-dashed border-outline-variant text-primary font-bold text-sm flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-lg" data-icon="add">add</span>
+                        Add Source
+                    </button>
+</div>
+<div class="flex-1 overflow-y-auto p-3">
+<div class="flex items-center justify-between px-2 py-2 mb-2">
+<span class="text-xs font-semibold text-secondary">Select all sources</span>
+<input checked="" class="w-4 h-4 rounded text-primary border-outline-variant" type="checkbox"/>
+</div>
+<div class="space-y-1">
+<div class="flex items-center gap-3 p-2.5 rounded-lg border border-transparent">
+<input checked="" class="w-4 h-4 rounded text-primary border-outline-variant" type="checkbox"/>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-medium text-on-surface truncate">Product_Spec.pdf</p>
+<p class="text-[10px] text-secondary">PDF Document • 24 pages</p>
+</div>
+</div>
+<div class="flex items-center gap-3 p-2.5 rounded-lg border border-transparent">
+<input checked="" class="w-4 h-4 rounded text-primary border-outline-variant" type="checkbox"/>
+<div class="flex-1 min-w-0">
+<p class="text-sm font-medium text-on-surface truncate">Design_Guide.docx</p>
+<p class="text-[10px] text-secondary">Word Doc • 12 pages</p>
+</div>
+</div>
+</div>
+</div>
+</aside>
+<!-- Middle Column: Chat Content -->
+<main class="flex-1 flex flex-col relative bg-white">
+<div class="flex-1 overflow-y-auto px-8 py-6">
+<div class="max-w-3xl mx-auto space-y-10">
+<div class="space-y-4">
+<div class="flex items-center gap-2 mb-2">
+<div class="w-6 h-6 bg-primary rounded flex items-center justify-center">
+<span class="material-symbols-outlined text-white text-[16px]" data-icon="auto_awesome">auto_awesome</span>
+</div>
+<span class="text-xs font-bold text-primary uppercase tracking-widest">Synthetic Analysis</span>
+</div>
+<div class="text-on-surface leading-relaxed space-y-4">
+<p>The core technical requirements outlined in <span class="font-semibold">Product_Spec.pdf</span><span class="citation-badge">1</span> focus on a modular architecture designed for high throughput...</p>
+<ul class="list-disc pl-5 space-y-2">
+<li><strong>System Response:</strong> The specification mandates 100ms response times for all AI-driven UI updates<span class="citation-badge">3, 4</span>.</li>
+<li><strong>Visual Consistency:</strong> Technical CSS variable definitions in the Spec accurately mirror the hierarchical rules<span class="citation-badge">5</span>.</li>
+</ul>
+</div>
+</div>
+</div>
+</div>
+<div class="p-6 bg-white border-t border-outline-variant">
+<div class="max-w-3xl mx-auto">
+<div class="bg-surface-container flex items-center gap-3 px-4 py-3 rounded-2xl border border-transparent">
+<button class="text-secondary"><span class="material-symbols-outlined" data-icon="attach_file">attach_file</span></button>
+<input class="flex-1 bg-transparent border-none text-sm py-1 placeholder:text-secondary/60" placeholder="Ask a question about your sources..." type="text"/>
+<button class="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined" data-icon="send" style="font-variation-settings: 'FILL' 1;">send</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Right Column: Studio -->
+<aside class="w-[320px] flex flex-col border-l border-outline-variant bg-white">
+<div class="p-4 border-b border-outline-variant">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-sm font-bold uppercase tracking-wider text-secondary">Studio</h2>
+<span class="material-symbols-outlined text-secondary" data-icon="dock_to_right">dock_to_right</span>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="flex flex-col items-center justify-center p-4 rounded-xl bg-surface-container border border-outline-variant/10">
+<span class="material-symbols-outlined text-primary text-2xl mb-2" data-icon="mic">mic</span>
+<span class="text-[11px] font-bold text-center leading-tight">Audio Overview</span>
+</div>
+<div class="flex flex-col items-center justify-center p-4 rounded-xl bg-surface-container border border-outline-variant/10">
+<span class="material-symbols-outlined text-primary text-2xl mb-2" data-icon="present_to_all">present_to_all</span>
+<span class="text-[11px] font-bold text-center leading-tight">Presentation</span>
+</div>
+</div>
+</div>
+<div class="flex-1 overflow-y-auto p-4">
+<h3 class="text-xs font-bold text-secondary uppercase tracking-widest mb-4">Saved Documents</h3>
+<div class="space-y-3">
+<div class="p-3 bg-white border border-outline-variant/40 rounded-xl">
+<div class="flex items-center gap-3 mb-2">
+<span class="material-symbols-outlined text-primary text-sm" data-icon="description">description</span>
+<span class="text-xs font-bold text-on-surface truncate">Tech-Design Alignment Note</span>
+</div>
+</div>
+</div>
+</div>
+</aside>
+</div>
+</div>
+</body></html>

@@ -1,0 +1,64 @@
+@import './variables.css';
+@import 'tailwindcss';
+
+@theme inline {
+  --font-sans: var(--font-body);
+  --font-display: var(--font-display);
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-low: var(--surface-low);
+  --color-surface-high: var(--surface-high);
+  --color-surface-top: var(--surface-top);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-deep: var(--primary-deep);
+  --color-secondary: var(--secondary);
+  --color-tertiary: var(--tertiary);
+  --color-outline: var(--outline-soft);
+  --shadow-paper: var(--shadow-paper);
+  --shadow-float: var(--shadow-float);
+  --shadow-glow: var(--shadow-glow);
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    background: var(--background);
+    color: var(--ink);
+    font-family: var(--font-body);
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    background:
+      radial-gradient(circle at top left, rgba(0, 91, 192, 0.06), transparent 28%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(248, 249, 250, 1));
+  }
+
+  button,
+  input,
+  textarea {
+    font: inherit;
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}
+
+@layer components {
+  .glass-panel {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(255, 255, 255, 0.58));
+    border: 1px solid rgba(255, 255, 255, 0.36);
+    backdrop-filter: blur(18px);
+  }
+}

@@ -9,3 +9,9 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+# Allow MCP config in VS Code
+!.vscode/mcp.json
+
+# # Ignore MCP config in VS Code
+# .vscode/mcp.json
