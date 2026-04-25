@@ -1,0 +1,32 @@
+[project]
+name = "pdp8-rag"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "dspy-ai>=3.0.4",
+    "pydantic-settings>=2.12.0",
+    "supabase>=2.24.0",
+    "python-dotenv>=1.0.0",
+    "openai>=1.54.0",
+    "marker-pdf[full]>=1.0.0",
+    "pgvector>=0.3.0",
+    "fastapi>=0.121.2",
+    "uvicorn>=0.38.0",
+    "gunicorn>=22.0.0",
+    "chonkie[semantic,st]>=1.4.2",
+    "google-generativeai>=0.8.5",
+    "pyyaml>=6.0.0",
+    "celery>=5.5.3",
+    "redis>=7.0.1",
+    "flower>=2.0.1",
+    "celery-redbeat>=2.3.3",
+    "pybreaker>=1.4.1",
+    "jinja2>=3.1.6",
+    "pyright>=1.1.407",
+    "python-multipart>=0.0.20",
+    "sentence-transformers>=3.0.0",
+    "torch>=2.0.0",
+    "google-genai>=1.50.1",
+]

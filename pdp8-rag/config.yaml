@@ -1,0 +1,58 @@
+# LLM Configuration
+llm:
+  # Default provider: gemini, openai, anthropic
+  provider: "gemini"
+
+  # Model settings
+  gemini:
+    model: "gemini-2.5-flash"  # Flash is much faster than Pro
+    embedding_model: "gemini-embedding-001"
+    temperature: 0.7
+    max_tokens: 20000
+
+  openai:
+    model: "gpt-4o"
+    embedding_model: "text-embedding-3-large"
+    temperature: 0.7
+    max_tokens: 2048
+
+# PDF Processing Configuration
+pdf:
+  use_llm: true
+  llm_model: "gemini-2.5-flash"
+
+# Chunking Configuration
+chunking:
+  strategy: "semantic"  # semantic, fixed, recursive
+  chunk_size: 512
+  similarity_threshold: 0.5
+
+# Vector Database Configuration
+vector_db:
+  embedding_dimension: 3072
+  similarity_metric: "cosine"
+
+# RAG Configuration
+rag:
+  mode: "adaptive"  # "adaptive", "single-hop", "multi-hop"
+  retrieval:
+    top_k: 10
+    similarity_threshold: 0.7
+    # Two-stage multi-document retrieval settings
+    # Stage 1: Quick scan to identify relevant documents
+    initial_chunks_per_doc: 2  # Get 2 chunks from each document for quick scoring (33 docs × 2 = 66 chunks)
+    top_n_documents: 5  # Select top 5 most relevant documents
+    # Stage 2: Deep search in selected documents
+    deep_chunks_per_doc: 8  # Get 8 chunks from each selected document (5 docs × 8 = 40 chunks)
+    # Total chunks to rerank: ~40 chunks (vs 330 with old approach)
+    use_reranking: true  # Enable cross-encoder reranking for better accuracy
+  reranking:
+    model: "BAAI/bge-reranker-v2-m3"  # Options: BAAI/bge-reranker-v2-m3, mixedbread-ai/mxbai-rerank-large-v1
+    enabled: true
+  generation:
+    temperature: 0.3
+    max_tokens: 8000
+  multihop:
+    enabled: true
+    max_hops: 4
+    passages_per_hop: 4  

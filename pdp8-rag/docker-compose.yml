@@ -1,0 +1,51 @@
+services:
+  redis:
+    image: redis:7
+    container_name: pdp8-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - pdp8-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pdp8-backend
+    ports:
+      - "8009:8000"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    volumes:
+      - ./app:/app/app
+      - ./config.yaml:/app/config.yaml
+      - ./uploads:/app/uploads
+      - ./models:/app/models
+    networks:
+      - pdp8-network
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: pdp8-worker
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    volumes:
+      - ./app:/app/app
+      - ./config.yaml:/app/config.yaml
+      - ./uploads:/app/uploads
+      - ./models:/app/models
+    networks:
+      - pdp8-network
+    restart: unless-stopped
+
+networks:
+  pdp8-network:
+    driver: bridge

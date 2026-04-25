@@ -1,0 +1,32 @@
+# Celery worker
+FROM python:3.12-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user with home directory
+RUN groupadd -r appuser && useradd -r -g appuser -m -d /home/appuser appuser
+
+# Install uv via pip
+RUN pip install uv
+
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen
+
+COPY app ./app
+COPY config.yaml ./
+COPY models ./models
+COPY uploads ./uploads
+
+# Change ownership to non-root user
+RUN chown -R appuser:appuser /app /home/appuser
+
+# Switch to non-root user
+USER appuser
+
+CMD ["uv", "run", "celery", "-A", "app.workers.celery_app", "worker", \
+     "--loglevel=info", \
+     "--concurrency=2"]
