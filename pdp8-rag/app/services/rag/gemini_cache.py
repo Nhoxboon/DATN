@@ -46,9 +46,14 @@ class GeminiCacheService:
             for i, chunk in enumerate(chunks, 1):
                 content = chunk.get("content", "")
                 page_range = chunk.get("page_range", "unknown")
-                context_parts.append(
-                    f"[Source {i}] (Pages: {page_range})\n{content}\n"
-                )
+                metadata = chunk.get("metadata") or {}
+                source_header = f"[Source {i}] (Pages: {page_range})"
+                if metadata.get("has_visual", False):
+                    source_header += (
+                        f"\nContent type: {metadata.get('content_type', 'visual_description')} "
+                        "extracted from image/figure descriptions"
+                    )
+                context_parts.append(f"{source_header}\n{content}\n")
 
             full_context = "\n\n".join(context_parts)
 
@@ -61,7 +66,8 @@ class GeminiCacheService:
             system_instruction = (
                 "You are an expert analyst of Vietnam's Power Development Plan VIII (PDP8). "
                 "Answer questions based on the provided document context. "
-                "Use **bold** for key terms, cite sources with [N] format, and preserve tables."
+                "Use **bold** for key terms, cite sources with [N] format, preserve tables, "
+                "and treat image or figure descriptions as extracted evidence from document visuals."
             )
 
             cache = self.client.caches.create(

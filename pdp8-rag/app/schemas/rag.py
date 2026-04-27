@@ -1,7 +1,7 @@
 """Schemas for RAG endpoints."""
 
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class QueryRequest(BaseModel):
@@ -20,6 +20,10 @@ class SourceInfo(BaseModel):
     pages: List[int]
     page_range: str
     similarity: float
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    content_type: str = "text"
+    has_visual: bool = False
+    image_url: Optional[str] = None
 
 
 class QueryResponse(BaseModel):

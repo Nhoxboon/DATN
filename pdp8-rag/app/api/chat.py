@@ -83,6 +83,7 @@ async def send_message(
 async def send_message_stream(
     message: str = Query(..., description="User message"),
     document_name: Optional[str] = Query(None, description="Optional document name to filter results"),
+    document: Optional[str] = Query(None, description="Deprecated alias for document_name"),
     session_id: Optional[str] = Cookie(None)
 ):
     """
@@ -108,6 +109,7 @@ async def send_message_stream(
     # Add user message to history
     user_message = ChatMessage(role="user", content=message)
     chat_session.add_message(session_id, user_message)
+    selected_document = document_name or document
 
     async def event_generator():
         """Generate SSE events."""
@@ -116,7 +118,7 @@ async def send_message_stream(
 
         try:
             # Stream RAG response
-            async for chunk in rag_service.query_stream(question=message):
+            async for chunk in rag_service.query_stream(question=message, document_name=selected_document):
                 if chunk["type"] == "token":
                     # Stream token
                     full_answer += chunk["content"]

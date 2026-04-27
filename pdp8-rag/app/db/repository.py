@@ -30,6 +30,8 @@ class DocumentRepository(Protocol):
 
     def get_document_name_by_id(self, doc_id: int) -> Optional[str]: ...
 
+    def get_all_chunks_by_names(self, doc_names: List[str]) -> List[Dict[str, Any]]: ...
+
     def delete_by_name(self, document_name: str) -> bool: ...
 
 
@@ -197,7 +199,7 @@ class SupabaseDocumentRepository:
             offset = 0
             while True:
                 result = self.client.table("documents")\
-                    .select("content, page_range, pages, document_name")\
+                    .select("content, page_range, pages, document_name, metadata")\
                     .eq("document_name", doc_name)\
                     .range(offset, offset + page_size - 1)\
                     .execute()

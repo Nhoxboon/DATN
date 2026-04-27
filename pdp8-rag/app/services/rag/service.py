@@ -100,6 +100,34 @@ class RAGService:
         else:
             raise ValueError(f"Invalid RAG mode: {mode}. Must be 'adaptive', 'single-hop', or 'multi-hop'.")
 
+    @staticmethod
+    def _get_effective_doc_names(
+        document_name: Optional[str] = None,
+        doc_names: Optional[List[str]] = None
+    ) -> Optional[List[str]]:
+        """Normalize single-document and multi-document filters."""
+        if doc_names is not None:
+            return doc_names
+        if document_name:
+            return [document_name]
+        return None
+
+    @staticmethod
+    def _format_source(chunk: Dict[str, Any]) -> Dict[str, Any]:
+        """Format a retrieved chunk for API responses and frontend citations."""
+        metadata = chunk.get("metadata") or {}
+        return {
+            "content": chunk.get("content", ""),
+            "document": chunk.get("document_name", ""),
+            "pages": chunk.get("pages", []),
+            "page_range": chunk.get("page_range", "unknown"),
+            "similarity": chunk.get("similarity", 0.0),
+            "metadata": metadata,
+            "content_type": metadata.get("content_type", "text"),
+            "has_visual": bool(metadata.get("has_visual", False)),
+            "image_url": metadata.get("image_url")
+        }
+
     def query(self, question: str, document_name: Optional[str] = None, doc_names: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Answer a question using RAG.
@@ -114,11 +142,12 @@ class RAGService:
         """
         import time
         start_time = time.time()
+        effective_doc_names = self._get_effective_doc_names(document_name, doc_names)
 
         # Run RAG with doc_ids if provided
         print("[TIMING] Starting DSPy RAG call...")
-        if doc_names is not None:
-            prediction = self.rag(question=question, doc_names=doc_names)
+        if effective_doc_names is not None:
+            prediction = self.rag(question=question, doc_names=effective_doc_names)
         else:
             prediction = self.rag(question=question)
         print(f"[TIMING] DSPy RAG completed in {time.time() - start_time:.2f}s")
@@ -138,13 +167,7 @@ class RAGService:
         # Add source chunks if available
         if hasattr(prediction, 'chunks'):
             response["sources"] = [
-                {
-                    "content": chunk.get("content", ""),
-                    "document": chunk.get("document_name", ""),
-                    "pages": chunk.get("pages", []),
-                    "page_range": chunk.get("page_range", "unknown"),
-                    "similarity": chunk.get("similarity", 0.0)
-                }
+                self._format_source(chunk)
                 for chunk in prediction.chunks
             ]
 
@@ -174,23 +197,24 @@ class RAGService:
         import queue
         import threading
         import time
+        effective_doc_names = self._get_effective_doc_names(document_name, doc_names)
 
         # Fast path: Use cached context for document-filtered queries (single or multiple)
-        if doc_names and len(doc_names) <= 3:  # Support up to 3 documents with caching
+        if effective_doc_names and len(effective_doc_names) <= 3:  # Support up to 3 documents with caching
             # Create a combined cache key for multiple documents
-            cache_key = "|".join(sorted(doc_names))
+            cache_key = "|".join(sorted(effective_doc_names))
             cache_name = self.cache_service.get_cache_name(cache_key)
 
             # If cache doesn't exist, create it
             if not cache_name:
-                print(f"[CACHE] Creating cache for documents: {', '.join(doc_names)}")
+                print(f"[CACHE] Creating cache for documents: {', '.join(effective_doc_names)}")
                 start = time.time()
                 # Get ALL chunks from the specified documents (not query-filtered)
                 chunks = await asyncio.to_thread(
                     self.retrieval_service.doc_repo.get_all_chunks_by_names,
-                    doc_names
+                    effective_doc_names
                 )
-                print(f"[CACHE] Fetched {len(chunks)} total chunks from {len(doc_names)} document(s)")
+                print(f"[CACHE] Fetched {len(chunks)} total chunks from {len(effective_doc_names)} document(s)")
                 cache_name = await asyncio.to_thread(
                     self.cache_service.create_document_cache,
                     cache_key,
@@ -201,7 +225,7 @@ class RAGService:
 
             # Use cached generation if cache exists
             if cache_name:
-                num_docs = len(doc_names)
+                num_docs = len(effective_doc_names)
                 strategy = f"cached-{'single' if num_docs == 1 else 'multi'}-hop"
                 print(f"[CACHE] Using cached context for {num_docs} document(s)")
                 try:
@@ -210,7 +234,7 @@ class RAGService:
                         asyncio.to_thread(
                             self.retrieval_service.retrieve,
                             query=question,
-                            doc_names=doc_names
+                            doc_names=effective_doc_names
                         )
                     )
 
@@ -226,13 +250,7 @@ class RAGService:
                     # Wait for retrieval to finish and get sources
                     retrieved_chunks = await retrieval_task
                     sources = [
-                        {
-                            "content": chunk.get("content", ""),
-                            "document": chunk.get("document_name", ""),
-                            "pages": chunk.get("pages", []),
-                            "page_range": chunk.get("page_range", "unknown"),
-                            "similarity": chunk.get("similarity", 0.0)
-                        }
+                        self._format_source(chunk)
                         for chunk in retrieved_chunks
                     ]
 
@@ -261,7 +279,7 @@ class RAGService:
             try:
                 # Run the streaming implementation
                 async def stream():
-                    async for item in self._query_stream_impl(question, document_name, doc_names):
+                    async for item in self._query_stream_impl(question, None, effective_doc_names):
                         chunk_queue.put(("chunk", item))
                     chunk_queue.put(("done", None))
 
@@ -288,7 +306,7 @@ class RAGService:
                 elif msg_type == "error":
                     # Fallback to simulated streaming on error
                     import re
-                    result = await asyncio.to_thread(self.query, question, document_name)
+                    result = await asyncio.to_thread(self.query, question, None, effective_doc_names)
                     answer = result.get("answer", "")
                     tokens = re.split(r'(\s+)', answer)
 
@@ -319,10 +337,11 @@ class RAGService:
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Internal implementation of query_stream within DSPy context."""
         import asyncio
+        effective_doc_names = self._get_effective_doc_names(document_name, doc_names)
 
         # Set doc_ids on RAG module if provided
-        if doc_names is not None and hasattr(self.rag, 'doc_names'):
-            self.rag.doc_names = doc_names
+        if effective_doc_names is not None and hasattr(self.rag, 'doc_names'):
+            setattr(self.rag, "doc_names", effective_doc_names)
 
         # For adaptive RAG, we need to specify which predictor to stream from
         # Since the complexity is assessed first, we'll stream from the chosen strategy
@@ -331,12 +350,12 @@ class RAGService:
             assert isinstance(self.rag, AdaptiveRAG)
 
             # Set doc_names on sub-modules
-            if doc_names is not None:
-                self.rag.single_hop.doc_names = doc_names
-                self.rag.multi_hop.doc_names = doc_names
+            if effective_doc_names is not None:
+                self.rag.single_hop.doc_names = effective_doc_names
+                self.rag.multi_hop.doc_names = effective_doc_names
 
             # Use optimized strategy selection (skip assessment for filtered docs)
-            if doc_names is not None and len(doc_names) <= 2:
+            if effective_doc_names is not None and len(effective_doc_names) <= 2:
                 # Force single-hop for document-filtered queries
                 target_module = self.rag.single_hop
                 strategy = "single-hop"
@@ -363,7 +382,7 @@ class RAGService:
             ]
 
             stream_module = dspy.streamify(target_module, stream_listeners=stream_listeners)  # type: ignore
-            output_stream = stream_module(question=question, doc_names=doc_names)  # type: ignore
+            output_stream = stream_module(question=question, doc_names=effective_doc_names)  # type: ignore
         else:
             # For single-hop or multi-hop mode, stream directly
             if self.mode == "single-hop":
@@ -382,7 +401,7 @@ class RAGService:
                 ]
 
             stream_rag = dspy.streamify(self.rag, stream_listeners=stream_listeners)  # type: ignore
-            output_stream = stream_rag(question=question, doc_names=doc_names)  # type: ignore
+            output_stream = stream_rag(question=question, doc_names=effective_doc_names)  # type: ignore
             strategy = self.mode
             strategy_reasoning = None
 
@@ -438,13 +457,7 @@ class RAGService:
             # Add source chunks if available
             if hasattr(final_prediction, 'chunks'):
                 metadata["sources"] = [
-                    {
-                        "content": chunk.get("content", ""),
-                        "document": chunk.get("document_name", ""),
-                        "pages": chunk.get("pages", []),
-                        "page_range": chunk.get("page_range", "unknown"),
-                        "similarity": chunk.get("similarity", 0.0)
-                    }
+                    self._format_source(chunk)
                     for chunk in final_prediction.chunks
                 ]
 

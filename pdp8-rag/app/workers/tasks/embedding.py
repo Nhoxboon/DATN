@@ -58,7 +58,10 @@ def generate_embedding_and_store_task(
                 "start_index": chunk_data["start_index"],
                 "end_index": chunk_data["end_index"],
                 "token_count": chunk_data["token_count"],
-                "has_table": chunk_data.get("has_table", False)
+                "has_table": chunk_data.get("has_table", False),
+                "has_visual": chunk_data.get("has_visual", False),
+                "visual_pages": chunk_data.get("visual_pages", []),
+                "content_type": chunk_data.get("content_type", "text")
             },
             pages=chunk_data["pages"],
             page_range=chunk_data["page_range"]

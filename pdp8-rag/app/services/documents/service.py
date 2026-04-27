@@ -106,6 +106,10 @@ class DocumentService:
         markdown_content, metadata = self.pdf_processor.process_pdf(file_path)
         chunks = self.pdf_processor.chunk_text_with_pages(markdown_content, metadata)
 
+        # Replace existing chunks for this document so re-indexing does not
+        # leave stale text-only chunks alongside image-aware chunks.
+        self.doc_repository.delete_by_name(document_name)
+
         # Store chunks with embeddings
         for chunk in chunks:
             chunk_content = chunk["text"]
@@ -120,7 +124,12 @@ class DocumentService:
                     "end_index": chunk.get("end_index"),
                     "token_count": chunk.get("token_count"),
                     "has_table": chunk.get("has_table", False),
+                    "has_visual": chunk.get("has_visual", False),
+                    "visual_pages": chunk.get("visual_pages", []),
+                    "content_type": chunk.get("content_type", "text"),
                     "total_pages": metadata.get("total_pages"),
+                    "image_count": metadata.get("image_count", 0),
+                    "describe_images": metadata.get("describe_images", False),
                     'storage_path': storage_path,
                     'public_url': public_url
                 },

@@ -3,6 +3,8 @@
 from functools import lru_cache
 from pathlib import Path
 import yaml
+from typing import Optional
+
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -26,6 +28,8 @@ class PDFConfig(BaseModel):
     """PDF processing configuration."""
     use_llm: bool
     llm_model: str
+    describe_images: bool = False
+    image_caption_model: Optional[str] = None
 
 
 class ChunkingConfig(BaseModel):

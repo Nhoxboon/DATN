@@ -10,6 +10,7 @@ from app.services.embedding import EmbeddingService
 from app.services.storage import StorageService
 from app.db.dependencies import get_supabase_client
 from app.db.processing_status import get_processing_status_repository, ProcessingStatus
+from app.db.repository import get_document_repository
 from app.workers.tasks.embedding import generate_embedding_and_store_task
 from app.workers.tasks.storage import finalize_document_task
 from pathlib import Path
@@ -113,6 +114,11 @@ def extract_and_chunk_task(self, document_name: str, file_path: str):
 
         supabase_client = get_supabase_client()
         status_repo = get_processing_status_repository(supabase_client)
+        doc_repo = get_document_repository(supabase_client)
+
+        # Replace existing chunks for this document so re-indexing writes a
+        # clean image-aware corpus instead of duplicating stale text-only rows.
+        doc_repo.delete_by_name(document_name)
 
         # Update total chunks
         status_repo.update_status(

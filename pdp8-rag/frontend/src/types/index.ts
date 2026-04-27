@@ -3,7 +3,7 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   sources?: Source[];
-  strategy?: 'single-hop' | 'multi-hop';
+  strategy?: string;
   strategy_reasoning?: string;
   isFromHistory?: boolean;
 }
@@ -14,6 +14,10 @@ export interface Source {
   page_range: string;
   content: string;
   similarity: number;
+  metadata?: Record<string, unknown>;
+  content_type?: string;
+  has_visual?: boolean;
+  image_url?: string | null;
 }
 
 
@@ -42,7 +46,7 @@ export interface StreamData {
   content?: string;
   message?: string;
   sources?: Source[];
-  strategy?: 'single-hop' | 'multi-hop';
+  strategy?: string;
   strategy_reasoning?: string;
 }
 

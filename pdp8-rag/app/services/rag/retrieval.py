@@ -226,9 +226,16 @@ class RetrievalService:
             content = chunk.get("content", "")
             page_range = chunk.get("page_range", "unknown")
             document_name = chunk.get("document_name", "unknown")
+            metadata = chunk.get("metadata") or {}
+            content_type = metadata.get("content_type", "text")
+            has_visual = metadata.get("has_visual", False)
+
+            source_header = f"[Source {i}] Document: {document_name}, Pages: {page_range}"
+            if has_visual:
+                source_header += f"\nContent type: {content_type} extracted from image/figure descriptions"
 
             context_parts.append(
-                f"[Source {i}] Document: {document_name}, Pages: {page_range}\n{content}"
+                f"{source_header}\n{content}"
             )
 
         return "\n\n---\n\n".join(context_parts)

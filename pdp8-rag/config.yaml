@@ -20,6 +20,8 @@ llm:
 pdf:
   use_llm: true
   llm_model: "gemini-2.5-flash"
+  describe_images: true
+  image_caption_model: "gemini-2.5-flash"
 
 # Chunking Configuration
 chunking:

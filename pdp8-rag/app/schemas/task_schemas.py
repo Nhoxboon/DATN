@@ -14,6 +14,9 @@ class ChunkData(BaseModel):
     pages: List[int]
     page_range: str
     has_table: bool = False
+    has_visual: bool = False
+    visual_pages: List[int] = Field(default_factory=list)
+    content_type: str = "text"
 
 
 class DocumentMetadata(BaseModel):

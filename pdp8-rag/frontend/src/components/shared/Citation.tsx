@@ -10,6 +10,10 @@ interface CitationSource {
   page_range: string;
   similarity: number;
   content: string;
+  content_type?: string;
+  has_visual?: boolean;
+  image_url?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 interface CitationProps {
@@ -21,7 +25,7 @@ export function Citation({ source, number }: CitationProps) {
   const [showPopup, setShowPopup] = useState(false);
   const citationRef = useRef<HTMLElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
-  const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hideTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const portalContainer = usePortal('citation-portal');
 
   const position = usePopupPosition({
@@ -90,10 +94,22 @@ export function Citation({ source, number }: CitationProps) {
           <div className="text-[13px] font-semibold text-gray-600 dark:text-gray-400">
             Pages {source.page_range} • {(source.similarity * 100).toFixed(1)}% relevance
           </div>
+          {source.has_visual && (
+            <div className="mt-2 inline-flex rounded-full bg-violet-100 px-2 py-0.5 text-[11px] font-semibold text-violet-700 dark:bg-violet-900/40 dark:text-violet-200">
+              Visual extraction
+            </div>
+          )}
         </div>
 
         {/* Content */}
         <div className="px-6 py-5 text-sm leading-[1.8] text-gray-900 dark:text-gray-100 overflow-y-auto max-h-[400px] [&::-webkit-scrollbar]:w-[10px] [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-track]:my-2 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:dark:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-[5px] [&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-transparent [&::-webkit-scrollbar-thumb]:bg-clip-padding [&::-webkit-scrollbar-thumb:hover]:bg-gray-400 [&::-webkit-scrollbar-thumb:hover]:dark:bg-gray-500">
+          {source.image_url && (
+            <img
+              src={source.image_url}
+              alt={`${source.document || 'Document'} visual source`}
+              className="mb-4 max-h-56 w-full rounded-lg object-contain bg-gray-100 dark:bg-gray-800"
+            />
+          )}
           <div className="prose prose-sm dark:prose-invert max-w-none">
             <ReactMarkdown
               components={{

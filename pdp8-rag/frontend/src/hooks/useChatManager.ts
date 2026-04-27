@@ -93,7 +93,7 @@ export function useChat(): UseChatReturn {
     try {
       let url = `/chat/stream?message=${encodeURIComponent(message)}`;
       if (documentName) {
-        url += `&document=${encodeURIComponent(documentName)}`;
+        url += `&document_name=${encodeURIComponent(documentName)}`;
       }
       
       eventSourceRef.current = new EventSource(url);
