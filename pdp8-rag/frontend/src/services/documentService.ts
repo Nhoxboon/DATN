@@ -44,6 +44,6 @@ export const documentService = {
   },
 
   async delete(documentName: string): Promise<void> {
-    return api.delete<void>(`/documents/${documentName}`);
+    return api.delete<void>(`/documents/${encodeURIComponent(documentName)}`);
   },
 };

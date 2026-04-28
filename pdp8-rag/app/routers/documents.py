@@ -1,6 +1,7 @@
 """Document management API endpoints."""
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from app.core.document_naming import validate_pdf_filename
 from app.services.documents import DocumentService, get_document_service
 from app.db.dependencies import get_supabase_client
 from app.db.repository import get_document_repository
@@ -48,8 +49,9 @@ async def upload_file(
     """
     try:
         # Validate file type
-        if not file.filename or not file.filename.endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="Only PDF files are supported")
+        if not file.filename:
+            raise HTTPException(status_code=400, detail="Filename is required")
+        validate_pdf_filename(file.filename)
 
         # Read file content
         content = await file.read()

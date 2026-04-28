@@ -14,6 +14,9 @@ RUN groupadd -r appuser && useradd -r -g appuser -m -d /home/appuser appuser
 # Install uv via pip
 RUN pip install uv
 
+# Configure uv to download Pytorch CUDA wheels
+ENV UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu121
+
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
 

@@ -1,5 +1,6 @@
 """Document processing Celery tasks."""
 
+from typing import Any, cast
 from celery import chord, group
 from app.workers.celery_app import celery_app
 from app.workers.middleware.circuit_breaker import circuit_breaker, CircuitBreakerOpen
@@ -13,7 +14,7 @@ from app.db.processing_status import get_processing_status_repository, Processin
 from app.db.repository import get_document_repository
 from app.workers.tasks.embedding import generate_embedding_and_store_task
 from app.workers.tasks.storage import finalize_document_task
-from pathlib import Path
+from app.core.document_naming import safe_pdf_storage_path
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
@@ -50,13 +51,13 @@ def process_document_task(self, document_name: str, file_path: str):
 
             # Step 1: Upload to storage if not already uploaded
             if not file_path.startswith("http"):
-                upload_result = storage_service.upload_pdf(file_path)
-                storage_path = upload_result["path"]
-            else:
-                storage_path = file_path
+                storage_service.upload_pdf(
+                    file_path,
+                    destination_path=safe_pdf_storage_path(document_name)
+                )
 
             # Step 2: Extract and chunk document
-            result = extract_and_chunk_task.apply_async(
+            result = cast(Any, extract_and_chunk_task).apply_async(
                 args=[document_name, file_path],
                 queue="document_processing"
             )
@@ -130,7 +131,7 @@ def extract_and_chunk_task(self, document_name: str, file_path: str):
         # Fan-out: Create embedding tasks for all chunks in parallel
         # Fan-in: Use chord to aggregate results and finalize
         embedding_tasks = group(
-            generate_embedding_and_store_task.s(
+            cast(Any, generate_embedding_and_store_task).s(
                 document_name=document_name,
                 chunk_data=chunk
             )
@@ -139,7 +140,10 @@ def extract_and_chunk_task(self, document_name: str, file_path: str):
 
         # Chord: Run all embeddings in parallel, then finalize
         workflow = chord(embedding_tasks)(
-            finalize_document_task.s(document_name=document_name, total_chunks=len(chunks))
+            cast(Any, finalize_document_task).s(
+                document_name=document_name,
+                total_chunks=len(chunks)
+            )
         )
 
         return {

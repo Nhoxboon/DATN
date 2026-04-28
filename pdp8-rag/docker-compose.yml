@@ -24,6 +24,13 @@ services:
       - ./config.yaml:/app/config.yaml
       - ./uploads:/app/uploads
       - ./models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     networks:
       - pdp8-network
     restart: unless-stopped
@@ -42,6 +49,13 @@ services:
       - ./config.yaml:/app/config.yaml
       - ./uploads:/app/uploads
       - ./models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     networks:
       - pdp8-network
     restart: unless-stopped

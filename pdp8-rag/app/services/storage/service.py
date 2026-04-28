@@ -3,6 +3,7 @@
 from pathlib import Path
 from typing import Optional
 from supabase import Client
+from app.core.document_naming import document_name_from_filename, safe_pdf_storage_path
 
 
 class StorageService:
@@ -37,7 +38,8 @@ class StorageService:
             raise FileNotFoundError(f"File not found: {file_path}")
 
         if not destination_path:
-            destination_path = file_path_obj.name
+            document_name = document_name_from_filename(file_path_obj.name)
+            destination_path = safe_pdf_storage_path(document_name)
 
         # Upload file (with upsert option)
         with open(file_path, "rb") as f:
@@ -51,6 +53,7 @@ class StorageService:
                     )
                 except Exception:
                     # If update fails, upload as new
+                    f.seek(0)
                     response = self.client.storage.from_(self.bucket_name).upload(
                         destination_path,
                         f,

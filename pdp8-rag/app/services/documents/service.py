@@ -1,8 +1,15 @@
 """Document management service."""
 
 import os
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from supabase import Client
+from app.core.document_naming import (
+    document_name_from_filename,
+    normalize_document_name,
+    safe_pdf_storage_path,
+    validate_pdf_filename,
+)
 from app.services.pdf_processor.processor import PDFProcessor
 from app.services.embedding import EmbeddingService
 from app.db.repository import DocumentRepository
@@ -68,15 +75,16 @@ class DocumentService:
             raise FileNotFoundError(f"File not found: {file_path}")
 
         # Validate PDF file
-        if not file_path.lower().endswith('.pdf'):
-            raise ValueError("Only PDF files are supported")
+        validate_pdf_filename(Path(file_path).name)
 
         # Determine document name
         if document_name is None:
-            document_name = os.path.basename(file_path).replace('.pdf', '')
+            document_name = document_name_from_filename(Path(file_path).name)
+        else:
+            document_name = normalize_document_name(document_name)
 
         # Upload to Supabase Storage
-        storage_path = f"{document_name}.pdf"
+        storage_path = safe_pdf_storage_path(document_name)
 
         with open(file_path, 'rb') as f:
             file_data = f.read()
@@ -171,7 +179,9 @@ class DocumentService:
         try:
             # Use the main upload method
             if document_name is None:
-                document_name = filename.replace('.pdf', '')
+                document_name = document_name_from_filename(filename)
+            else:
+                document_name = normalize_document_name(document_name)
 
             result = self.upload_document(tmp_path, document_name)
             return result
@@ -204,8 +214,15 @@ class DocumentService:
         if success:
             # Try to delete from storage (best effort)
             try:
-                storage_path = f"{document_name}.pdf"
-                self.supabase_client.storage.from_(self.storage_bucket).remove([storage_path])
+                storage_paths = [
+                    safe_pdf_storage_path(document_name),
+                    f"{document_name}.pdf",
+                ]
+                for storage_path in dict.fromkeys(storage_paths):
+                    try:
+                        self.supabase_client.storage.from_(self.storage_bucket).remove([storage_path])
+                    except Exception:
+                        pass
             except Exception:
                 # If storage deletion fails, continue (chunks are already deleted)
                 pass
