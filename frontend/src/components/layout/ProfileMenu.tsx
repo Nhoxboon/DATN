@@ -11,9 +11,10 @@ interface ProfileMenuProps {
   open: boolean
   profile: UserProfile | null
   onClose: () => void
+  onSignOut: () => void
 }
 
-export function ProfileMenu({ anchorRef, open, profile, onClose }: ProfileMenuProps) {
+export function ProfileMenu({ anchorRef, open, profile, onClose, onSignOut }: ProfileMenuProps) {
   const portalTarget = usePortal()
   const position = usePopupPosition(anchorRef, open)
 
@@ -51,14 +52,17 @@ export function ProfileMenu({ anchorRef, open, profile, onClose }: ProfileMenuPr
             <KeyRound className="h-4 w-4 text-primary" />
             Change password
           </Link>
-          <Link
-            to="/login"
-            className="flex items-center gap-3 rounded-[18px] px-3 py-2.5 text-ink transition hover:bg-white/80"
-            onClick={onClose}
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 rounded-[18px] px-3 py-2.5 text-left text-ink transition hover:bg-white/80"
+            onClick={() => {
+              onClose()
+              onSignOut()
+            }}
           >
             <LogOut className="h-4 w-4 text-primary" />
             Sign out
-          </Link>
+          </button>
         </div>
       </div>
     </>,

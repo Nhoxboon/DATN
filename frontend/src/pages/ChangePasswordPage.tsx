@@ -3,16 +3,48 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useState } from 'react'
 import { AuthField } from '../components/auth/AuthField'
 import { Button } from '../components/shared/Button'
+import { getAuthErrorMessage } from '../services/authService'
+import { useAuth } from '../hooks/useAuth'
 
 export function ChangePasswordPage() {
   const navigate = useNavigate()
+  const { updatePassword } = useAuth()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
-  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    navigate('/dashboard')
+    setError(null)
+    setNotice(null)
+
+    if (newPassword.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.')
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      await updatePassword(newPassword, currentPassword)
+      setNotice('Password updated successfully.')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+      window.setTimeout(() => navigate('/dashboard'), 900)
+    } catch (authError) {
+      setError(getAuthErrorMessage(authError))
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -40,6 +72,16 @@ export function ChangePasswordPage() {
           </div>
 
           <form className="flex flex-col pt-0" onSubmit={handleSubmit} noValidate>
+            {notice && (
+              <div className="mb-5 rounded-[14px] bg-[rgba(0,91,192,0.08)] px-4 py-3 text-sm leading-6 text-primary">
+                {notice}
+              </div>
+            )}
+            {error && (
+              <div className="mb-5 rounded-[14px] bg-red-50 px-4 py-3 text-sm leading-6 text-red-700">
+                {error}
+              </div>
+            )}
             <div className="flex flex-col" style={{ gap: '1.25rem' }}>
               <AuthField
                 label="Current Password"
@@ -47,6 +89,8 @@ export function ChangePasswordPage() {
                 placeholder="Enter your current password"
                 value={currentPassword}
                 onChange={setCurrentPassword}
+                autoComplete="current-password"
+                disabled={submitting}
               />
 
               <AuthField
@@ -55,6 +99,8 @@ export function ChangePasswordPage() {
                 placeholder="Enter your new password"
                 value={newPassword}
                 onChange={setNewPassword}
+                autoComplete="new-password"
+                disabled={submitting}
               />
 
               <AuthField
@@ -63,11 +109,13 @@ export function ChangePasswordPage() {
                 placeholder="Repeat your new password"
                 value={confirmPassword}
                 onChange={setConfirmPassword}
+                autoComplete="new-password"
+                disabled={submitting}
               />
             </div>
 
-            <Button type="submit" className="mt-8 h-11 w-full justify-center rounded-lg">
-              Update Password
+            <Button type="submit" className="mt-8 h-11 w-full justify-center rounded-lg" disabled={submitting}>
+              {submitting ? 'Updating...' : 'Update Password'}
             </Button>
           </form>
 

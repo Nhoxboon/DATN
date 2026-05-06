@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { NotebookDetail, NotebookSummary, UploadCandidate, UserProfile } from '../types'
 import { documentService } from '../services/documentService'
+import { buildUserProfile } from '../services/authService'
+import { useAuth } from './useAuth'
 
 export function useDocuments(notebookId?: string) {
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [summaries, setSummaries] = useState<NotebookSummary[]>([])
   const [profile, setProfile] = useState<UserProfile | null>(null)
@@ -16,7 +19,7 @@ export function useDocuments(notebookId?: string) {
       setLoading(true)
 
       const [profileData, summaryData, uploadData, notebookData] = await Promise.all([
-        documentService.getProfile(),
+        Promise.resolve(buildUserProfile(user)),
         documentService.getNotebookSummaries(),
         documentService.getUploadCandidates(),
         notebookId ? documentService.getNotebookDetail(notebookId) : Promise.resolve(null),
@@ -38,7 +41,7 @@ export function useDocuments(notebookId?: string) {
     return () => {
       cancelled = true
     }
-  }, [notebookId])
+  }, [notebookId, user])
 
   const processUploads = async (uploadIds: string[]) => {
     if (!notebookId) {

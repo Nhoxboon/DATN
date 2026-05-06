@@ -9,16 +9,23 @@ import { ChatMessageList } from '../components/chat/ChatMessageList'
 import { StudioDocumentsPanel } from '../components/history/StudioDocumentsPanel'
 import { useChatManager } from '../hooks/useChatManager'
 import { useDocuments } from '../hooks/useDocuments'
+import { useAuth } from '../hooks/useAuth'
 
 export function NotebookEditorPage() {
   const { notebookId = '' } = useParams()
   const navigate = useNavigate()
+  const { signOut } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const modalOpen = searchParams.get('modal') === 'add-sources'
   const avatarRef = useRef<HTMLButtonElement | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const { loading, notebook, uploadPool, processUploads, profile } = useDocuments(notebookId)
   const { messages, isPending, sendMessage } = useChatManager(notebookId)
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
 
   const openModal = () => {
     setSearchParams({ modal: 'add-sources' })
@@ -110,6 +117,9 @@ export function NotebookEditorPage() {
         open={profileOpen}
         profile={profile}
         onClose={() => setProfileOpen(false)}
+        onSignOut={() => {
+          void handleSignOut()
+        }}
       />
     </main>
   )

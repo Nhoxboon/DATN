@@ -1,0 +1,32 @@
+services:
+  redis:
+    image: redis:7
+    container_name: datn-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - datn-network
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: datn-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      - redis
+    volumes:
+      - ./app:/app/app
+    networks:
+      - datn-network
+    restart: unless-stopped
+
+networks:
+  datn-network:
+    driver: bridge

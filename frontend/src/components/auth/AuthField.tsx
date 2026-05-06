@@ -7,6 +7,9 @@ interface AuthFieldProps {
   type?: 'text' | 'email' | 'password'
   value: string
   onChange: (value: string) => void
+  autoComplete?: string
+  disabled?: boolean
+  name?: string
 }
 
 export function AuthField({
@@ -15,6 +18,9 @@ export function AuthField({
   type = 'text',
   value,
   onChange,
+  autoComplete,
+  disabled = false,
+  name,
 }: AuthFieldProps) {
   const [reveal, setReveal] = useState(false)
   const isPassword = type === 'password'
@@ -27,6 +33,9 @@ export function AuthField({
           type={isPassword && reveal ? 'text' : type}
           placeholder={placeholder}
           value={value}
+          name={name}
+          autoComplete={autoComplete}
+          disabled={disabled}
           onChange={(event) => onChange(event.target.value)}
           className="w-full rounded-[var(--radius-panel)] bg-white px-4 py-3.5 text-sm text-ink shadow-[inset_0_0_0_1px_rgba(171,179,183,0.18)] outline-none transition placeholder:text-muted/80 focus:shadow-[inset_0_0_0_1.5px_var(--primary),0_0_0_4px_rgba(0,91,192,0.08)]"
         />
@@ -34,6 +43,7 @@ export function AuthField({
           <button
             type="button"
             onClick={() => setReveal((current) => !current)}
+            disabled={disabled}
             className="absolute inset-y-0 right-3 flex items-center text-muted transition hover:text-ink"
             aria-label={reveal ? 'Hide password' : 'Show password'}
           >

@@ -5,12 +5,19 @@ import { NotebookCard } from '../components/history/NotebookCard'
 import { ProfileMenu } from '../components/layout/ProfileMenu'
 import { Button } from '../components/shared/Button'
 import { useDocuments } from '../hooks/useDocuments'
+import { useAuth } from '../hooks/useAuth'
 
 export function DashboardPage() {
   const navigate = useNavigate()
+  const { signOut } = useAuth()
   const { loading, summaries, profile } = useDocuments()
   const avatarRef = useRef<HTMLButtonElement | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
+
+  const handleSignOut = async () => {
+    await signOut()
+    navigate('/login', { replace: true })
+  }
 
   return (
     <main className="min-h-screen bg-background">
@@ -92,6 +99,9 @@ export function DashboardPage() {
           open={profileOpen}
           profile={profile}
           onClose={() => setProfileOpen(false)}
+          onSignOut={() => {
+            void handleSignOut()
+          }}
         />
       </div>
     </main>

@@ -1,0 +1,1 @@
+"""DATN backend application package."""
