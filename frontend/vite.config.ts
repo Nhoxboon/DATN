@@ -33,12 +33,18 @@ export default defineConfig(({ mode }) => {
     rootEnv.VITE_APP_URL ||
     backendEnv.VITE_APP_URL ||
     'http://localhost:5173'
+  const backendUrl =
+    frontendEnv.VITE_BACKEND_URL ||
+    rootEnv.VITE_BACKEND_URL ||
+    backendEnv.VITE_BACKEND_URL ||
+    'http://localhost:8000'
 
   return {
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
       'import.meta.env.VITE_APP_URL': JSON.stringify(appUrl),
+      'import.meta.env.VITE_BACKEND_URL': JSON.stringify(backendUrl),
     },
     plugins: [
       react(),

@@ -16,6 +16,15 @@ def get_supabase_admin_client() -> Any:
 
 
 @lru_cache
+def get_supabase_anon_client() -> Any:
+    """Return a Supabase client using the public anon key for user-facing auth flows."""
+    from supabase import create_client
+
+    settings = get_settings()
+    return create_client(settings.supabase_url, settings.supabase_anon_key)
+
+
+@lru_cache
 def get_redis_client() -> Any:
     """Return a Redis client for streaming/cache features."""
     from redis import Redis

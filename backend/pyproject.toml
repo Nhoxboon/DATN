@@ -5,6 +5,7 @@ description = "Backend API for DATN auth and future RAG modules"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "email-validator>=2.2.0",
     "fastapi>=0.121.2",
     "gunicorn>=22.0.0",
     "pydantic-settings>=2.12.0",

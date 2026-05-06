@@ -43,7 +43,7 @@ export function SignUpPage() {
         return
       }
 
-      setNotice('Check your email to confirm your account before signing in.')
+      setNotice('If this email can be registered, we sent a confirmation link. If you already have an account, please sign in.')
     } catch (authError) {
       setError(getAuthErrorMessage(authError))
     } finally {
@@ -78,7 +78,7 @@ export function SignUpPage() {
         </span>
       }
     >
-      <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+      <form className="space-y-6" onSubmit={handleSubmit} noValidate>
         {notice && (
           <div className="rounded-[14px] bg-[rgba(0,91,192,0.08)] px-4 py-3 text-sm leading-6 text-primary">
             {notice}
@@ -113,7 +113,11 @@ export function SignUpPage() {
           autoComplete="new-password"
           disabled={submitting || googleLoading}
         />
-        <Button type="submit" className="w-full justify-center" disabled={submitting || googleLoading}>
+        <Button
+          type="submit"
+          className="mt-7 w-full justify-center"
+          disabled={submitting || googleLoading}
+        >
           {submitting ? 'Creating account...' : 'Sign Up'}
         </Button>
         <div className="flex items-center gap-4 py-2 text-sm text-muted">

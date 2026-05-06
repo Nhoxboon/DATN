@@ -1,6 +1,6 @@
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AuthField } from '../components/auth/AuthField'
 import { AuthShell } from '../components/auth/AuthShell'
 import { Button } from '../components/shared/Button'
@@ -13,9 +13,27 @@ export function ForgotPasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [cooldownSeconds, setCooldownSeconds] = useState(0)
+
+  useEffect(() => {
+    if (cooldownSeconds <= 0) {
+      return undefined
+    }
+
+    const timerId = window.setTimeout(() => {
+      setCooldownSeconds((current) => Math.max(current - 1, 0))
+    }, 1000)
+
+    return () => window.clearTimeout(timerId)
+  }, [cooldownSeconds])
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (cooldownSeconds > 0) {
+      return
+    }
+
     setError(null)
     setNotice(null)
     setSubmitting(true)
@@ -23,6 +41,7 @@ export function ForgotPasswordPage() {
     try {
       await requestPasswordReset(email.trim())
       setNotice('If an account exists for this email, a secure reset link has been sent.')
+      setCooldownSeconds(60)
     } catch (authError) {
       setError(getAuthErrorMessage(authError))
     } finally {
@@ -56,16 +75,29 @@ export function ForgotPasswordPage() {
           autoComplete="email"
           disabled={submitting}
         />
-        <Button type="submit" className="w-full justify-center" disabled={submitting}>
-          {submitting ? 'Sending...' : 'Send Reset Link'}
+        <Button
+          type="submit"
+          className="mt-7 w-full justify-center"
+          disabled={submitting || cooldownSeconds > 0}
+        >
+          {submitting
+            ? 'Sending...'
+            : cooldownSeconds > 0
+              ? `Send again in ${cooldownSeconds}s`
+              : 'Send Reset Link'}
         </Button>
-        <Link to="/login" className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-deep">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Login
-        </Link>
-        <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(0,91,192,0.08)] px-4 py-2 text-sm text-muted">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          Secure recovery link
+        <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
+          <Link
+            to="/login"
+            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-deep"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Login
+          </Link>
+          <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(0,91,192,0.08)] px-4 py-2 text-sm text-muted">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            Secure recovery link
+          </div>
         </div>
       </form>
     </AuthShell>

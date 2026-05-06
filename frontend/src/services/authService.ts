@@ -13,6 +13,10 @@ function appUrl() {
   return configuredUrl.replace(/\/$/, '')
 }
 
+function backendUrl() {
+  return (import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '')
+}
+
 function authCallbackUrl(nextPath?: string) {
   const url = new URL(`${appUrl()}/auth/callback`)
 
@@ -84,15 +88,40 @@ export const authService = {
   },
 
   async signUp(email: string, password: string): Promise<AuthResult> {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: authCallbackUrl(),
+    const response = await fetch(`${backendUrl()}/auth/sign-up`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        email,
+        password,
+        email_redirect_to: authCallbackUrl(),
+      }),
     })
 
-    return requireNoError({ session: data.session, user: data.user }, error)
+    const data = (await response.json().catch(() => ({}))) as {
+      detail?: string
+      session?: { access_token?: string; refresh_token?: string } | null
+    }
+
+    if (!response.ok) {
+      throw new Error(data.detail || 'Could not create account. Please try again.')
+    }
+
+    if (data.session?.access_token && data.session.refresh_token) {
+      const { data: sessionData, error } = await supabase.auth.setSession({
+        access_token: data.session.access_token,
+        refresh_token: data.session.refresh_token,
+      })
+
+      return requireNoError(
+        { session: sessionData.session, user: sessionData.session?.user ?? null },
+        error,
+      )
+    }
+
+    return { session: null, user: null }
   },
 
   async signInWithGoogle(nextPath?: string) {

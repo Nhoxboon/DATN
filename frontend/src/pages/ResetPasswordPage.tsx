@@ -79,19 +79,25 @@ export function ResetPasswordPage() {
           autoComplete="new-password"
           disabled={submitting || loading || !user}
         />
-        <Button type="submit" className="w-full justify-center" disabled={submitting || loading || !user}>
+        <Button
+          type="submit"
+          className="mt-7 w-full justify-center"
+          disabled={submitting || loading || !user}
+        >
           {submitting ? 'Updating...' : 'Update Password'}
         </Button>
-        <Link
-          to="/forgot-password"
-          className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-deep"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Request a new link
-        </Link>
-        <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(0,91,192,0.08)] px-4 py-2 text-sm text-muted">
-          <ShieldCheck className="h-4 w-4 text-primary" />
-          Secure password recovery
+        <div className="flex flex-col gap-3 pt-1 sm:flex-row sm:items-center sm:justify-between">
+          <Link
+            to="/forgot-password"
+            className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary-deep"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Request a new link
+          </Link>
+          <div className="inline-flex items-center gap-2 rounded-full bg-[rgba(0,91,192,0.08)] px-4 py-2 text-sm text-muted">
+            <ShieldCheck className="h-4 w-4 text-primary" />
+            Secure password recovery
+          </div>
         </div>
       </form>
     </AuthShell>
