@@ -10,13 +10,27 @@ import { useAuth } from '../hooks/useAuth'
 export function DashboardPage() {
   const navigate = useNavigate()
   const { signOut } = useAuth()
-  const { loading, summaries, profile } = useDocuments()
+  const { loading, summaries, profile, createNotebook, deleteNotebook, error } = useDocuments()
   const avatarRef = useRef<HTMLButtonElement | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
 
   const handleSignOut = async () => {
     await signOut()
     navigate('/login', { replace: true })
+  }
+
+  const handleCreateNotebook = async () => {
+    const created = await createNotebook()
+    navigate(`/notebooks/${created.id}`)
+  }
+
+  const handleDeleteNotebook = async (id: string) => {
+    const notebook = summaries.find((item) => item.id === id)
+    if (!window.confirm(`Delete "${notebook?.title ?? 'this notebook'}"?`)) {
+      return
+    }
+
+    await deleteNotebook(id)
   }
 
   return (
@@ -57,12 +71,20 @@ export function DashboardPage() {
 
           <Button
             className="h-10 rounded-lg px-4 py-0 text-xs font-semibold shadow-none"
-            onClick={() => navigate('/notebooks/new-research-project')}
+            onClick={() => {
+              void handleCreateNotebook()
+            }}
           >
             <PlusCircle className="h-3.5 w-3.5" />
             Create New Notebook
           </Button>
         </div>
+
+        {error && (
+          <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        )}
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {loading
@@ -74,12 +96,17 @@ export function DashboardPage() {
                 key={notebook.id}
                 notebook={notebook}
                 onOpen={(id) => navigate(`/notebooks/${id}`)}
+                onDelete={(id) => {
+                  void handleDeleteNotebook(id)
+                }}
               />
             ))}
 
         <button
           type="button"
-          onClick={() => navigate('/notebooks/new-research-project')}
+          onClick={() => {
+            void handleCreateNotebook()
+          }}
           className="flex min-h-38 flex-col items-center justify-center rounded-[10px] border border-dashed border-outline/80 bg-transparent px-8 py-6 text-center transition hover:bg-white/45"
         >
           <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-[10px] bg-surface-high text-primary">

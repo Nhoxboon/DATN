@@ -15,6 +15,11 @@ def get_supabase_admin_client() -> Any:
     return create_client(settings.supabase_url, settings.supabase_service_key)
 
 
+def get_supabase_client() -> Any:
+    """Return the service-role Supabase client expected by copied RAG modules."""
+    return get_supabase_admin_client()
+
+
 @lru_cache
 def get_supabase_anon_client() -> Any:
     """Return a Supabase client using the public anon key for user-facing auth flows."""

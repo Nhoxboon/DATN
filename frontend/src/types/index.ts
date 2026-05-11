@@ -1,6 +1,7 @@
 export type AuthFormMode = 'login' | 'signup' | 'forgot-password'
 
 export type SourceKind = 'pdf' | 'docx' | 'txt'
+export type DocumentStatusValue = 'pending' | 'processing' | 'completed' | 'failed'
 
 export interface UserProfile {
   id: string
@@ -24,6 +25,8 @@ export interface SourceItem {
   kind: SourceKind
   meta: string
   selected: boolean
+  status?: DocumentStatusValue
+  errorMessage?: string | null
 }
 
 export interface StudioDocument {
@@ -32,6 +35,10 @@ export interface StudioDocument {
   excerpt: string
   updatedAt: string
   icon: 'description' | 'table_chart'
+  question?: string
+  answer?: string
+  sources?: RagSource[]
+  documentNames?: string[]
 }
 
 export interface ChatMessage {
@@ -39,6 +46,8 @@ export interface ChatMessage {
   role: 'assistant' | 'user'
   content: string
   timestamp: string
+  sources?: RagSource[]
+  saved?: boolean
 }
 
 export interface UploadCandidate {
@@ -54,4 +63,71 @@ export interface NotebookDetail extends NotebookSummary {
   synthesisBullets: string[]
   sources: SourceItem[]
   studioDocuments: StudioDocument[]
+}
+
+export interface BackendNotebookSummary {
+  id: string
+  title: string
+  description: string | null
+  source_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface BackendDocumentStatus {
+  id: string | null
+  document_name: string
+  status: DocumentStatusValue
+  total_chunks: number | null
+  processed_chunks: number | null
+  error_message: string | null
+  created_at: string | null
+  updated_at: string | null
+}
+
+export interface BackendNotebookNote {
+  id: string
+  question: string
+  answer: string
+  sources: RagSource[]
+  document_names: string[]
+  created_at: string
+  updated_at: string
+}
+
+export interface BackendNotebookDetail extends BackendNotebookSummary {
+  documents: BackendDocumentStatus[]
+  notes: BackendNotebookNote[]
+}
+
+export interface RagSource {
+  content: string
+  document: string
+  pages?: number[]
+  page_range: string
+  similarity: number
+  metadata?: Record<string, unknown>
+  content_type?: string
+  has_visual?: boolean
+  image_url?: string | null
+}
+
+export interface BackendChatMessage {
+  id: string
+  role: 'assistant' | 'user' | 'system'
+  content: string
+  sources: RagSource[]
+  created_at: string
+}
+
+export interface BackendChatCurrent {
+  session_id: string
+  messages: BackendChatMessage[]
+}
+
+export interface BackendChatSendResponse extends BackendChatCurrent {
+  answer: string
+  sources: RagSource[]
+  strategy?: string | null
+  strategy_reasoning?: string | null
 }

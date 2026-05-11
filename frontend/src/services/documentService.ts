@@ -1,69 +1,152 @@
-import { notebookDetails, notebookSummaries, uploadCandidates, userProfile } from '../data/mockData'
-import type { NotebookDetail, NotebookSummary, UploadCandidate, UserProfile } from '../types'
-import { withDelay } from './api'
+import type {
+  BackendDocumentStatus,
+  BackendNotebookDetail,
+  BackendNotebookNote,
+  BackendNotebookSummary,
+  NotebookDetail,
+  NotebookSummary,
+  SourceItem,
+  StudioDocument,
+} from '../types'
+import { apiFetch } from './api'
 
-const detailStore = structuredClone(notebookDetails) as Record<string, NotebookDetail>
+function updatedLabel(value: string | null | undefined) {
+  if (!value) {
+    return 'Updated just now'
+  }
 
-function cloneDetail(detail: NotebookDetail) {
-  return structuredClone(detail) as NotebookDetail
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Updated just now'
+  }
+
+  return `Updated ${date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: '2-digit',
+    year: 'numeric',
+  })}`
+}
+
+function statusMeta(document: BackendDocumentStatus) {
+  if (document.status === 'completed') {
+    const chunks = document.total_chunks ?? document.processed_chunks
+    return chunks ? `PDF Document - ${chunks} chunks indexed` : 'PDF Document - Indexed'
+  }
+
+  if (document.status === 'failed') {
+    return document.error_message || 'Indexing failed'
+  }
+
+  const processed = document.processed_chunks ?? 0
+  const total = document.total_chunks ?? '?'
+  return `Indexing - ${processed}/${total} chunks`
+}
+
+function toSource(document: BackendDocumentStatus): SourceItem {
+  return {
+    id: document.id || document.document_name,
+    name: document.document_name,
+    kind: 'pdf',
+    meta: statusMeta(document),
+    selected: document.status === 'completed',
+    status: document.status,
+    errorMessage: document.error_message,
+  }
+}
+
+function toNote(note: BackendNotebookNote): StudioDocument {
+  const excerpt = note.answer.replace(/\s+/g, ' ').slice(0, 150)
+
+  return {
+    id: note.id,
+    icon: 'description',
+    title: note.question,
+    excerpt: excerpt ? `${excerpt}${note.answer.length > 150 ? '...' : ''}` : 'Saved AI answer',
+    updatedAt: updatedLabel(note.updated_at),
+    question: note.question,
+    answer: note.answer,
+    sources: note.sources,
+    documentNames: note.document_names,
+  }
+}
+
+function toSummary(summary: BackendNotebookSummary): NotebookSummary {
+  return {
+    id: summary.id,
+    category: 'Research Studio',
+    title: summary.title,
+    sourceCount: summary.source_count,
+    updatedAt: updatedLabel(summary.updated_at),
+    description: summary.description || 'Notebook workspace for selected research sources.',
+  }
+}
+
+function toDetail(detail: BackendNotebookDetail): NotebookDetail {
+  const summary = toSummary(detail)
+  const completedCount = detail.documents.filter((document) => document.status === 'completed').length
+
+  return {
+    ...summary,
+    sourceCount: completedCount,
+    synthesisTitle: completedCount ? 'Notebook Context Ready' : 'Add Sources',
+    synthesisBody: completedCount
+      ? 'Ask a question about the selected sources. The answer will cite the documents that are checked in the source rail.'
+      : 'Upload PDF sources to this notebook, then select the documents you want the assistant to scan.',
+    synthesisBullets: completedCount
+      ? [
+          'Checked sources define the retrieval scope for each answer.',
+          'Chat history is saved until you start a new chat.',
+          'Use "Lưu vào sổ ghi chú" to preserve important answers in Studio.',
+        ]
+      : [
+          'Upload one or more PDF files.',
+          'Wait until indexing is completed.',
+          'Select completed sources before asking a question.',
+        ],
+    sources: detail.documents.map(toSource),
+    studioDocuments: detail.notes.map(toNote),
+  }
 }
 
 export const documentService = {
-  async getProfile(): Promise<UserProfile> {
-    return withDelay(structuredClone(userProfile))
+  async getNotebookSummaries(): Promise<NotebookSummary[]> {
+    const data = await apiFetch<BackendNotebookSummary[]>('/notebooks')
+    return data.map(toSummary)
   },
 
-  async getNotebookSummaries(): Promise<NotebookSummary[]> {
-    const refreshed = notebookSummaries.map((summary) => {
-      const detail = detailStore[summary.id]
-
-      return {
-        ...summary,
-        sourceCount: detail?.sources.length ?? summary.sourceCount,
-      }
+  async createNotebook(title = 'Untitled Notebook'): Promise<NotebookDetail> {
+    const data = await apiFetch<BackendNotebookDetail>('/notebooks', {
+      method: 'POST',
+      body: JSON.stringify({ title }),
     })
+    return toDetail(data)
+  },
 
-    return withDelay(refreshed)
+  async deleteNotebook(notebookId: string): Promise<void> {
+    await apiFetch<void>(`/notebooks/${encodeURIComponent(notebookId)}`, {
+      method: 'DELETE',
+    })
   },
 
   async getNotebookDetail(notebookId: string): Promise<NotebookDetail | null> {
-    const detail = detailStore[notebookId]
-
-    return withDelay(detail ? cloneDetail(detail) : null)
+    const data = await apiFetch<BackendNotebookDetail>(`/notebooks/${encodeURIComponent(notebookId)}`)
+    return toDetail(data)
   },
 
-  async getUploadCandidates(): Promise<UploadCandidate[]> {
-    return withDelay(structuredClone(uploadCandidates))
+  async uploadDocument(notebookId: string, file: File): Promise<NotebookDetail | null> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    await apiFetch(`/notebooks/${encodeURIComponent(notebookId)}/documents/upload`, {
+      method: 'POST',
+      body: formData,
+    })
+
+    return this.getNotebookDetail(notebookId)
   },
 
-  async addSources(notebookId: string, uploadIds: string[]): Promise<NotebookDetail | null> {
-    const detail = detailStore[notebookId]
-
-    if (!detail) {
-      return withDelay(null)
-    }
-
-    const selectedUploads = uploadCandidates.filter((upload) => uploadIds.includes(upload.id))
-    const existingNames = new Set(detail.sources.map((source) => source.name))
-
-    for (const upload of selectedUploads) {
-      if (existingNames.has(upload.name)) {
-        continue
-      }
-
-      detail.sources.unshift({
-        id: `${notebookId}-${upload.id}`,
-        name: upload.name,
-        kind: upload.kind,
-        meta:
-          upload.kind === 'docx'
-            ? `Word Doc • ${upload.sizeLabel}`
-            : `PDF Document • ${upload.sizeLabel}`,
-        selected: true,
-      })
-    }
-
-    detail.sourceCount = detail.sources.length
-    return withDelay(cloneDetail(detail))
+  async getNotes(notebookId: string): Promise<StudioDocument[]> {
+    const data = await apiFetch<BackendNotebookNote[]>(`/notebooks/${encodeURIComponent(notebookId)}/notes`)
+    return data.map(toNote)
   },
 }

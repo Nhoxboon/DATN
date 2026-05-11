@@ -4,9 +4,10 @@ import type { NotebookSummary } from '../../types'
 interface NotebookCardProps {
   notebook: NotebookSummary
   onOpen: (id: string) => void
+  onDelete?: (id: string) => void
 }
 
-export function NotebookCard({ notebook, onOpen }: NotebookCardProps) {
+export function NotebookCard({ notebook, onOpen, onDelete }: NotebookCardProps) {
   return (
     <button
       type="button"
@@ -17,7 +18,25 @@ export function NotebookCard({ notebook, onOpen }: NotebookCardProps) {
         <div className="inline-flex items-center rounded-full bg-[rgba(112,68,193,0.12)] px-2.5 py-1 text-[0.56rem] font-semibold uppercase tracking-[0.16em] text-tertiary">
           {notebook.category}
         </div>
-        <MoreHorizontal className="h-4 w-4 text-muted/75 transition group-hover:text-ink" />
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(event) => {
+            event.stopPropagation()
+            onDelete?.(notebook.id)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              event.stopPropagation()
+              onDelete?.(notebook.id)
+            }
+          }}
+          className="rounded-md p-1 text-muted/75 transition hover:bg-surface-low hover:text-ink"
+          aria-label={`Delete ${notebook.title}`}
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </span>
       </div>
 
       <div className="space-y-2">

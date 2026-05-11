@@ -1,40 +1,114 @@
-import { initialChatMessages, notebookDetails } from '../data/mockData'
-import type { ChatMessage } from '../types'
-import { withDelay } from './api'
+import type {
+  BackendChatCurrent,
+  BackendChatMessage,
+  BackendChatSendResponse,
+  BackendNotebookNote,
+  ChatMessage,
+  RagSource,
+  StudioDocument,
+} from '../types'
+import { apiFetch } from './api'
 
-const conversationStore: Record<string, ChatMessage[]> = {}
-
-function ensureConversation(notebookId: string) {
-  if (!conversationStore[notebookId]) {
-    conversationStore[notebookId] = structuredClone(initialChatMessages.default)
+function timeLabel(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return 'Just now'
   }
 
-  return conversationStore[notebookId]
+  return date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function toMessage(message: BackendChatMessage): ChatMessage | null {
+  if (message.role === 'system') {
+    return null
+  }
+
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    timestamp: timeLabel(message.created_at),
+    sources: message.sources,
+  }
+}
+
+function toMessages(messages: BackendChatMessage[]) {
+  return messages.map(toMessage).filter((message): message is ChatMessage => Boolean(message))
+}
+
+function toStudioDocument(note: BackendNotebookNote): StudioDocument {
+  const excerpt = note.answer.replace(/\s+/g, ' ').slice(0, 150)
+
+  return {
+    id: note.id,
+    icon: 'description',
+    title: note.question,
+    excerpt: excerpt ? `${excerpt}${note.answer.length > 150 ? '...' : ''}` : 'Saved AI answer',
+    updatedAt: 'Saved just now',
+    question: note.question,
+    answer: note.answer,
+    sources: note.sources,
+    documentNames: note.document_names,
+  }
 }
 
 export const chatService = {
   async getConversation(notebookId: string): Promise<ChatMessage[]> {
-    return withDelay(structuredClone(ensureConversation(notebookId)))
+    const data = await apiFetch<BackendChatCurrent>(
+      `/notebooks/${encodeURIComponent(notebookId)}/chat/current`,
+    )
+    return toMessages(data.messages)
   },
 
-  async sendMessage(notebookId: string, input: string): Promise<ChatMessage[]> {
-    const notebook = notebookDetails[notebookId]
-    const conversation = ensureConversation(notebookId)
+  async sendMessage(
+    notebookId: string,
+    input: string,
+    documentNames: string[],
+  ): Promise<ChatMessage[]> {
+    const data = await apiFetch<BackendChatSendResponse>(
+      `/notebooks/${encodeURIComponent(notebookId)}/chat/messages`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          message: input,
+          document_names: documentNames,
+        }),
+      },
+    )
 
-    conversation.push({
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: input,
-      timestamp: 'Just now',
+    return toMessages(data.messages)
+  },
+
+  async newChat(notebookId: string): Promise<ChatMessage[]> {
+    const data = await apiFetch<BackendChatCurrent>(
+      `/notebooks/${encodeURIComponent(notebookId)}/chat/new`,
+      {
+        method: 'POST',
+      },
+    )
+    return toMessages(data.messages)
+  },
+
+  async saveNote(
+    notebookId: string,
+    question: string,
+    answer: string,
+    sources: RagSource[],
+    documentNames: string[],
+  ): Promise<StudioDocument> {
+    const data = await apiFetch<BackendNotebookNote>(`/notebooks/${encodeURIComponent(notebookId)}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({
+        question,
+        answer,
+        sources,
+        document_names: documentNames,
+      }),
     })
 
-    conversation.push({
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      timestamp: 'Just now',
-      content: `For "${notebook?.title ?? 'this notebook'}", the strongest next move is to extract three claims from the selected sources, pressure-test them against counterexamples, and save the cleaned synthesis into Studio.`,
-    })
-
-    return withDelay(structuredClone(conversation), 420)
+    return toStudioDocument(data)
   },
 }

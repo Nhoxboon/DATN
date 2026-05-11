@@ -3,14 +3,21 @@ import { useState } from 'react'
 
 interface ChatComposerProps {
   disabled?: boolean
+  helperText?: string
+  placeholder?: string
   onSubmit: (value: string) => void
 }
 
-export function ChatComposer({ disabled = false, onSubmit }: ChatComposerProps) {
+export function ChatComposer({
+  disabled = false,
+  helperText = 'Sources cited automatically',
+  placeholder = 'Ask a question about your sources...',
+  onSubmit,
+}: ChatComposerProps) {
   const [value, setValue] = useState('')
 
   const handleSubmit = () => {
-    if (!value.trim()) {
+    if (disabled || !value.trim()) {
       return
     }
 
@@ -29,7 +36,14 @@ export function ChatComposer({ disabled = false, onSubmit }: ChatComposerProps) 
           <input
             value={value}
             onChange={(event) => setValue(event.target.value)}
-            placeholder="Ask a question about your sources..."
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
+                handleSubmit()
+              }
+            }}
+            disabled={disabled}
+            placeholder={placeholder}
             className="w-full bg-transparent text-[0.92rem] text-ink outline-none placeholder:text-muted"
           />
         </label>
@@ -43,8 +57,7 @@ export function ChatComposer({ disabled = false, onSubmit }: ChatComposerProps) 
         </button>
       </div>
       <div className="flex flex-wrap items-center justify-center gap-4 px-2 pt-3 text-[0.66rem] text-muted">
-        <span>Drafting context enabled</span>
-        <span>Sources cited automatically</span>
+        <span>{helperText}</span>
       </div>
     </div>
   )

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import type { NotebookDetail, NotebookSummary, UploadCandidate, UserProfile } from '../types'
+import { useCallback, useEffect, useState } from 'react'
+import type { NotebookDetail, NotebookSummary, UserProfile } from '../types'
 import { documentService } from '../services/documentService'
 import { buildUserProfile } from '../services/authService'
 import { useAuth } from './useAuth'
@@ -10,57 +10,94 @@ export function useDocuments(notebookId?: string) {
   const [summaries, setSummaries] = useState<NotebookSummary[]>([])
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [notebook, setNotebook] = useState<NotebookDetail | null>(null)
-  const [uploadPool, setUploadPool] = useState<UploadCandidate[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    setError(null)
+
+    try {
+      const [summaryData, notebookData] = await Promise.all([
+        documentService.getNotebookSummaries(),
+        notebookId ? documentService.getNotebookDetail(notebookId) : Promise.resolve(null),
+      ])
+
+      setProfile(buildUserProfile(user))
+      setSummaries(summaryData)
+      setNotebook(notebookData)
+    } catch (err) {
+      setError((err as Error).message)
+      setNotebook(null)
+    } finally {
+      setLoading(false)
+    }
+  }, [notebookId, user])
 
   useEffect(() => {
     let cancelled = false
 
-    async function load() {
-      setLoading(true)
-
-      const [profileData, summaryData, uploadData, notebookData] = await Promise.all([
-        Promise.resolve(buildUserProfile(user)),
-        documentService.getNotebookSummaries(),
-        documentService.getUploadCandidates(),
-        notebookId ? documentService.getNotebookDetail(notebookId) : Promise.resolve(null),
-      ])
-
+    async function loadIfCurrent() {
+      await load()
       if (cancelled) {
         return
       }
-
-      setProfile(profileData)
-      setSummaries(summaryData)
-      setUploadPool(uploadData)
-      setNotebook(notebookData)
-      setLoading(false)
     }
 
-    void load()
+    void loadIfCurrent()
 
     return () => {
       cancelled = true
     }
-  }, [notebookId, user])
+  }, [load])
 
-  const processUploads = async (uploadIds: string[]) => {
-    if (!notebookId) {
+  const createNotebook = async () => {
+    const created = await documentService.createNotebook()
+    const refreshedSummaries = await documentService.getNotebookSummaries()
+    setSummaries(refreshedSummaries)
+    return created
+  }
+
+  const deleteNotebook = async (id: string) => {
+    await documentService.deleteNotebook(id)
+    setSummaries((current) => current.filter((summary) => summary.id !== id))
+  }
+
+  const processUploads = async (files: File[]) => {
+    if (!notebookId || !files.length) {
       return
     }
 
-    const updatedNotebook = await documentService.addSources(notebookId, uploadIds)
-    const refreshedSummaries = await documentService.getNotebookSummaries()
+    let updatedNotebook: NotebookDetail | null = notebook
+    for (const file of files) {
+      updatedNotebook = await documentService.uploadDocument(notebookId, file)
+    }
 
+    const refreshedSummaries = await documentService.getNotebookSummaries()
     setNotebook(updatedNotebook)
     setSummaries(refreshedSummaries)
   }
 
+  const addStudioDocument = (document: NotebookDetail['studioDocuments'][number]) => {
+    setNotebook((current) =>
+      current
+        ? {
+            ...current,
+            studioDocuments: [document, ...current.studioDocuments],
+          }
+        : current,
+    )
+  }
+
   return {
     loading,
+    error,
     summaries,
     profile,
     notebook,
-    uploadPool,
+    createNotebook,
+    deleteNotebook,
     processUploads,
+    addStudioDocument,
+    reload: load,
   }
 }

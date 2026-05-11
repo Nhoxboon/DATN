@@ -1,7 +1,12 @@
 import { Mic, Presentation, FileText, TableProperties } from 'lucide-react'
 import type { StudioDocument } from '../../types'
 
-export function StudioDocumentsPanel({ documents }: { documents: StudioDocument[] }) {
+interface StudioDocumentsPanelProps {
+  documents: StudioDocument[]
+  onOpenDocument?: (document: StudioDocument) => void
+}
+
+export function StudioDocumentsPanel({ documents, onOpenDocument }: StudioDocumentsPanelProps) {
   return (
     <aside className="flex h-full flex-col">
       <div className="mb-6">
@@ -26,17 +31,24 @@ export function StudioDocumentsPanel({ documents }: { documents: StudioDocument[
       </div>
 
       <div className="mb-4 text-[0.76rem] font-semibold uppercase tracking-[0.12em] text-ink">
-        Saved Documents
+        Saved Notes
       </div>
 
       <div className="space-y-3">
+        {!documents.length && (
+          <div className="rounded-[10px] border border-dashed border-outline/70 px-4 py-5 text-[0.72rem] leading-5 text-muted">
+            Chưa có ghi chú nào được lưu.
+          </div>
+        )}
         {documents.map((document) => {
           const Icon = document.icon === 'description' ? FileText : TableProperties
 
           return (
-            <article
+            <button
               key={document.id}
-              className="rounded-[18px] border border-black/5 bg-white px-4 py-4 shadow-[0_8px_22px_rgba(43,52,55,0.05)]"
+              type="button"
+              onClick={() => onOpenDocument?.(document)}
+              className="block w-full rounded-[18px] border border-black/5 bg-white px-4 py-4 text-left shadow-[0_8px_22px_rgba(43,52,55,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(43,52,55,0.08)]"
             >
               <div className="flex items-start gap-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-surface-low text-primary">
@@ -48,7 +60,7 @@ export function StudioDocumentsPanel({ documents }: { documents: StudioDocument[
                   <p className="mt-2.5 text-[0.66rem] text-muted">{document.updatedAt}</p>
                 </div>
               </div>
-            </article>
+            </button>
           )
         })}
       </div>

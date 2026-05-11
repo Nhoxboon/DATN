@@ -1,38 +1,59 @@
 import { createPortal } from 'react-dom'
 import { AlertCircle, FileText, Trash2, Upload, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
-import type { UploadCandidate } from '../../types'
+import { useRef, useState } from 'react'
 import { usePortal } from '../../hooks/usePortal'
 
 interface AddSourcesModalProps {
   open: boolean
-  uploads: UploadCandidate[]
   onClose: () => void
-  onProcess: (uploadIds: string[]) => Promise<void>
+  onProcess: (files: File[]) => Promise<void>
 }
 
-export function AddSourcesModal({ open, uploads, onClose, onProcess }: AddSourcesModalProps) {
-  const portalTarget = usePortal()
-  const [selectedIds, setSelectedIds] = useState(() => uploads.map((upload) => upload.id))
-  const [isProcessing, setIsProcessing] = useState(false)
+function sizeLabel(file: File) {
+  const mb = file.size / 1024 / 1024
+  return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`
+}
 
-  const selectedUploads = useMemo(
-    () => uploads.filter((upload) => selectedIds.includes(upload.id)),
-    [selectedIds, uploads],
-  )
+export function AddSourcesModal({ open, onClose, onProcess }: AddSourcesModalProps) {
+  const portalTarget = usePortal()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   if (!open || !portalTarget) {
     return null
   }
 
-  const removeUpload = (uploadId: string) => {
-    setSelectedIds((current) => current.filter((id) => id !== uploadId))
+  const addFiles = (nextFiles: FileList | null) => {
+    if (!nextFiles) {
+      return
+    }
+
+    const pdfs = Array.from(nextFiles).filter((file) => file.name.toLowerCase().endsWith('.pdf'))
+    setFiles((current) => {
+      const existing = new Set(current.map((file) => `${file.name}:${file.size}`))
+      return [...current, ...pdfs.filter((file) => !existing.has(`${file.name}:${file.size}`))]
+    })
+    setError(pdfs.length === nextFiles.length ? null : 'Only PDF files are supported.')
+  }
+
+  const removeFile = (file: File) => {
+    setFiles((current) => current.filter((item) => item !== file))
   }
 
   const handleProcess = async () => {
     setIsProcessing(true)
-    await onProcess(selectedIds)
-    setIsProcessing(false)
+    setError(null)
+
+    try {
+      await onProcess(files)
+      setFiles([])
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   return createPortal(
@@ -43,7 +64,7 @@ export function AddSourcesModal({ open, uploads, onClose, onProcess }: AddSource
             <div>
               <h2 className="text-[1.55rem] font-medium text-ink">Add Sources</h2>
               <p className="mt-1 text-[0.76rem] text-muted">
-                Upload research papers, transcripts, or notes to your workspace.
+                Upload PDF files to this notebook.
               </p>
             </div>
             <button
@@ -57,64 +78,71 @@ export function AddSourcesModal({ open, uploads, onClose, onProcess }: AddSource
         </div>
 
         <div className="px-6 py-5">
-          <div className="rounded-[8px] border border-dashed border-outline/70 bg-surface-low/45 px-6 py-7 text-center">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf,.pdf"
+            multiple
+            className="hidden"
+            onChange={(event) => {
+              addFiles(event.target.files)
+              event.target.value = ''
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="w-full rounded-[8px] border border-dashed border-outline/70 bg-surface-low/45 px-6 py-7 text-center transition hover:bg-surface-low"
+          >
             <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] bg-[rgba(0,91,192,0.12)] text-primary">
               <Upload className="h-4.5 w-4.5" />
             </div>
-            <h3 className="text-[0.96rem] font-medium text-ink">Drag &amp; drop files here</h3>
-            <p className="mt-1 text-[0.66rem] text-muted">PDF, DOCX, or TXT (Max 50MB per file)</p>
-            <button
-              type="button"
-              className="mt-4 inline-flex h-8 items-center justify-center rounded-[8px] bg-primary px-4 text-[0.68rem] font-semibold text-white transition hover:brightness-105"
-            >
-              Browse Computer
-            </button>
-          </div>
+            <h3 className="text-[0.96rem] font-medium text-ink">Choose PDF files</h3>
+            <p className="mt-1 text-[0.66rem] text-muted">Max 50MB per file</p>
+          </button>
 
           <div className="mt-5">
             <div className="mb-3 flex items-center justify-between">
               <div className="text-[0.68rem] font-semibold uppercase tracking-[0.1em] text-muted">
-                Uploaded Files ({selectedUploads.length})
+                Selected Files ({files.length})
               </div>
-              <div className="text-[0.62rem] text-primary">All files ready</div>
+              <div className="text-[0.62rem] text-primary">{files.length ? 'Ready to index' : 'No files selected'}</div>
             </div>
 
             <div className="space-y-2 rounded-[8px] bg-surface-low/45 p-2">
-              {selectedUploads.map((upload) => {
-                return (
-                  <div
-                    key={upload.id}
-                    className="flex w-full items-center gap-3 rounded-[8px] border border-transparent bg-white px-3 py-2.5 text-left shadow-[0_2px_10px_rgba(43,52,55,0.05)]"
-                  >
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-surface-low text-primary">
-                      <FileText className="h-3.5 w-3.5" />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[0.74rem] font-medium text-ink">{upload.name}</div>
-                    </div>
-
-                    <div className="text-[0.64rem] text-muted">{upload.sizeLabel}</div>
-
-                    <button
-                      type="button"
-                      onClick={() => removeUpload(upload.id)}
-                      className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-muted transition hover:bg-surface-low hover:text-ink"
-                      aria-label={`Delete ${upload.name}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+              {files.map((file) => (
+                <div
+                  key={`${file.name}:${file.size}`}
+                  className="flex w-full items-center gap-3 rounded-[8px] border border-transparent bg-white px-3 py-2.5 text-left shadow-[0_2px_10px_rgba(43,52,55,0.05)]"
+                >
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-surface-low text-primary">
+                    <FileText className="h-3.5 w-3.5" />
                   </div>
-                )
-              })}
+
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[0.74rem] font-medium text-ink">{file.name}</div>
+                  </div>
+
+                  <div className="text-[0.64rem] text-muted">{sizeLabel(file)}</div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeFile(file)}
+                    className="ml-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-[4px] text-muted transition hover:bg-surface-low hover:text-ink"
+                    aria-label={`Delete ${file.name}`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         </div>
 
         <div className="flex flex-col gap-3 border-t border-black/8 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2 text-[0.64rem] text-muted">
+          <div className={`flex items-center gap-2 text-[0.64rem] ${error ? 'text-red-600' : 'text-muted'}`}>
             <AlertCircle className="h-3.5 w-3.5" />
-            <span>Files will be indexed for AI search automatically.</span>
+            <span>{error || 'Files will be indexed for AI search automatically.'}</span>
           </div>
 
           <div className="flex items-center justify-end gap-3">
@@ -128,10 +156,10 @@ export function AddSourcesModal({ open, uploads, onClose, onProcess }: AddSource
             <button
               type="button"
               onClick={handleProcess}
-              disabled={!selectedIds.length || isProcessing}
+              disabled={!files.length || isProcessing}
               className="inline-flex h-8 items-center justify-center rounded-[8px] bg-primary px-4 text-[0.68rem] font-semibold text-white transition hover:brightness-105 disabled:opacity-60"
             >
-              {isProcessing ? 'Processing...' : 'Process Sources'}
+              {isProcessing ? 'Indexing...' : 'Process Sources'}
             </button>
           </div>
         </div>
