@@ -7,7 +7,7 @@ from app.db.processing_status import get_processing_status_repository, Processin
 
 
 @celery_app.task(bind=True)
-def finalize_document_task(self, results: List[Dict[str, Any]], document_name: str, total_chunks: int):
+def finalize_document_task(self, results: List[Dict[str, Any]], document_name: str, notebook_id: str, total_chunks: int):
     """
     Finalize document processing after all embeddings are complete.
     This is the chord callback (fan-in).
@@ -15,6 +15,7 @@ def finalize_document_task(self, results: List[Dict[str, Any]], document_name: s
     Args:
         results: List of results from embedding tasks
         document_name: Name of the document
+        notebook_id: Notebook that owns the document
         total_chunks: Total number of chunks
 
     Returns:
@@ -31,9 +32,11 @@ def finalize_document_task(self, results: List[Dict[str, Any]], document_name: s
         if failed == 0:
             # All chunks processed successfully
             status_repo.update_status(
+                notebook_id,
                 document_name,
                 ProcessingStatus.COMPLETED,
-                processed_chunks=successful
+                processed_chunks=successful,
+                total_chunks=total_chunks
             )
 
             return {
@@ -46,9 +49,11 @@ def finalize_document_task(self, results: List[Dict[str, Any]], document_name: s
         else:
             # Some chunks failed
             status_repo.update_status(
+                notebook_id,
                 document_name,
                 ProcessingStatus.FAILED,
                 processed_chunks=successful,
+                total_chunks=total_chunks,
                 error_message=f"{failed} chunks failed to process"
             )
 
@@ -62,6 +67,7 @@ def finalize_document_task(self, results: List[Dict[str, Any]], document_name: s
 
     except Exception as e:
         status_repo.update_status(
+            notebook_id,
             document_name,
             ProcessingStatus.FAILED,
             error_message=f"Finalization failed: {str(e)}"

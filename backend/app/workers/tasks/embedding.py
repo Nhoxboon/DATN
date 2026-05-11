@@ -15,6 +15,8 @@ from app.db.repository import get_document_repository
 def generate_embedding_and_store_task(
     self,
     document_name: str,
+    notebook_id: str,
+    user_id: str,
     chunk_data: Dict[str, Any]
 ):
     """
@@ -23,6 +25,8 @@ def generate_embedding_and_store_task(
 
     Args:
         document_name: Name of the document
+        notebook_id: Notebook that owns the document
+        user_id: User that owns the notebook
         chunk_data: Chunk data dictionary
 
     Returns:
@@ -50,6 +54,8 @@ def generate_embedding_and_store_task(
         doc_repo = get_document_repository(supabase_client)
 
         doc_repo.insert_chunk(
+            notebook_id=notebook_id,
+            user_id=user_id,
             document_name=document_name,
             chunk_id=chunk_data["chunk_id"],
             content=chunk_data["text"],

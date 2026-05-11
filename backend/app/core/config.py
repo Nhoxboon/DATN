@@ -124,6 +124,8 @@ class Settings(BaseSettings):
     supabase_service_key: str = Field(..., description="Supabase service role key")
     redis_url: str = Field(..., description="Redis connection URL for streaming/cache")
     google_api_key: str = Field(..., description="Google Gemini API key for future RAG modules")
+    document_processing_mode: str = Field(default="sync", description="Document processing mode: sync or worker")
+    uploads_dir: str = Field(default="/app/uploads", description="Local shared upload directory for worker mode")
 
     @property
     def cors_origins(self) -> list[str]:

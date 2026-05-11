@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
-from app.core.document_naming import document_name_from_filename
+from app.core.config import get_settings
+from app.core.document_naming import document_name_from_filename, safe_pdf_storage_path
 from app.db.processing_status import ProcessingStatus, get_processing_status_repository
 from app.db.repository import get_document_repository
 from app.schemas.notebooks import (
@@ -131,15 +134,45 @@ class NotebookWorkspaceService:
         self._require_notebook(user_id, notebook_id)
         document_name = document_name_from_filename(filename)
         status_repo = get_processing_status_repository(self.client)
-        status_repo.create_status(
-            notebook_id=notebook_id,
-            user_id=user_id,
-            document_name=document_name,
-            task_id="sync-upload",
-        )
-        status_repo.update_status(notebook_id, document_name, ProcessingStatus.PROCESSING)
 
         try:
+            settings = get_settings()
+            if settings.document_processing_mode.lower() == "worker":
+                task_id = str(uuid4())
+                upload_dir = Path(settings.uploads_dir) / user_id / notebook_id
+                upload_dir.mkdir(parents=True, exist_ok=True)
+                file_path = upload_dir / safe_pdf_storage_path(document_name)
+                file_path.write_bytes(file_content)
+
+                from app.workers.tasks.document import process_document_task
+
+                status_repo.create_status(
+                    notebook_id=notebook_id,
+                    user_id=user_id,
+                    document_name=document_name,
+                    task_id=task_id,
+                )
+                process_document_task.apply_async(
+                    args=[notebook_id, user_id, document_name, str(file_path)],
+                    queue="document_processing",
+                    task_id=task_id,
+                )
+                self._touch_notebook(user_id, notebook_id)
+                return {
+                    "document_name": document_name,
+                    "chunks_processed": 0,
+                    "storage_path": str(file_path),
+                    "public_url": None,
+                    "queued": True,
+                }
+
+            status_repo.create_status(
+                notebook_id=notebook_id,
+                user_id=user_id,
+                document_name=document_name,
+                task_id="sync-upload",
+            )
+            status_repo.update_status(notebook_id, document_name, ProcessingStatus.PROCESSING)
             service = get_document_service()
             result = service.upload_from_bytes(
                 notebook_id=notebook_id,

@@ -70,6 +70,7 @@ class DocumentUploadResponse(BaseModel):
     chunks_processed: int
     storage_path: str
     public_url: str | None = None
+    queued: bool = False
     documents: list[DocumentStatus] = Field(default_factory=list)
 
 

@@ -19,11 +19,13 @@ from app.core.document_naming import safe_pdf_storage_path
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
 @circuit_breaker("pdf_processing", failure_threshold=5, timeout=300)
-def process_document_task(self, document_name: str, file_path: str):
+def process_document_task(self, notebook_id: str, user_id: str, document_name: str, file_path: str):
     """
     Main orchestrator task for document processing with fan-out/fan-in.
 
     Args:
+        notebook_id: Notebook that owns the document
+        user_id: User that owns the notebook
         document_name: Name of the document
         file_path: Path to the PDF file
 
@@ -39,26 +41,28 @@ def process_document_task(self, document_name: str, file_path: str):
 
     try:
         # Acquire distributed lock to prevent duplicate processing
-        with distributed_lock(f"document:{document_name}", timeout=3600):
+        with distributed_lock(f"document:{notebook_id}:{document_name}", timeout=3600):
             # Create processing status
             status_repo.create_status(
+                notebook_id=notebook_id,
+                user_id=user_id,
                 document_name=document_name,
                 task_id=self.request.id
             )
 
             # Update status to processing
-            status_repo.update_status(document_name, ProcessingStatus.PROCESSING)
+            status_repo.update_status(notebook_id, document_name, ProcessingStatus.PROCESSING)
 
             # Step 1: Upload to storage if not already uploaded
             if not file_path.startswith("http"):
                 storage_service.upload_pdf(
                     file_path,
-                    destination_path=safe_pdf_storage_path(document_name)
+                    destination_path=f"{user_id}/{notebook_id}/{safe_pdf_storage_path(document_name)}"
                 )
 
             # Step 2: Extract and chunk document
             result = cast(Any, extract_and_chunk_task).apply_async(
-                args=[document_name, file_path],
+                args=[notebook_id, user_id, document_name, file_path],
                 queue="document_processing"
             )
 
@@ -71,6 +75,7 @@ def process_document_task(self, document_name: str, file_path: str):
 
     except CircuitBreakerOpen as e:
         status_repo.update_status(
+            notebook_id,
             document_name,
             ProcessingStatus.FAILED,
             error_message=f"Circuit breaker open: {str(e)}"
@@ -79,6 +84,7 @@ def process_document_task(self, document_name: str, file_path: str):
 
     except Exception as e:
         status_repo.update_status(
+            notebook_id,
             document_name,
             ProcessingStatus.FAILED,
             error_message=str(e)
@@ -88,11 +94,13 @@ def process_document_task(self, document_name: str, file_path: str):
 
 @celery_app.task(bind=True, max_retries=3)
 @circuit_breaker("pdf_extraction", failure_threshold=3, timeout=180)
-def extract_and_chunk_task(self, document_name: str, file_path: str):
+def extract_and_chunk_task(self, notebook_id: str, user_id: str, document_name: str, file_path: str):
     """
     Extract PDF content and create chunks.
 
     Args:
+        notebook_id: Notebook that owns the document
+        user_id: User that owns the notebook
         document_name: Name of the document
         file_path: Path to the PDF file
 
@@ -119,13 +127,15 @@ def extract_and_chunk_task(self, document_name: str, file_path: str):
 
         # Replace existing chunks for this document so re-indexing writes a
         # clean image-aware corpus instead of duplicating stale text-only rows.
-        doc_repo.delete_by_name(document_name)
+        doc_repo.delete_by_name(document_name, notebook_id)
 
         # Update total chunks
         status_repo.update_status(
+            notebook_id,
             document_name,
             ProcessingStatus.PROCESSING,
-            processed_chunks=0
+            processed_chunks=0,
+            total_chunks=len(chunks)
         )
 
         # Fan-out: Create embedding tasks for all chunks in parallel
@@ -133,6 +143,8 @@ def extract_and_chunk_task(self, document_name: str, file_path: str):
         embedding_tasks = group(
             cast(Any, generate_embedding_and_store_task).s(
                 document_name=document_name,
+                notebook_id=notebook_id,
+                user_id=user_id,
                 chunk_data=chunk
             )
             for chunk in chunks
@@ -142,6 +154,7 @@ def extract_and_chunk_task(self, document_name: str, file_path: str):
         workflow = chord(embedding_tasks)(
             cast(Any, finalize_document_task).s(
                 document_name=document_name,
+                notebook_id=notebook_id,
                 total_chunks=len(chunks)
             )
         )
@@ -156,6 +169,7 @@ def extract_and_chunk_task(self, document_name: str, file_path: str):
         supabase_client = get_supabase_client()
         status_repo = get_processing_status_repository(supabase_client)
         status_repo.update_status(
+            notebook_id,
             document_name,
             ProcessingStatus.FAILED,
             error_message=f"Extraction failed: {str(e)}"

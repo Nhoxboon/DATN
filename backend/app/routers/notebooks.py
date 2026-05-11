@@ -146,6 +146,7 @@ async def upload_document(
             chunks_processed=int(result["chunks_processed"]),
             storage_path=str(result["storage_path"]),
             public_url=result.get("public_url"),
+            queued=bool(result.get("queued", False)),
             documents=documents,
         )
     except ValueError as exc:

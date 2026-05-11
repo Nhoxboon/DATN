@@ -13,7 +13,7 @@ redis_url = settings.redis_url
 
 # Initialize Celery app
 celery_app = Celery(
-    "pdp8_rag",
+    "datn_backend",
     broker=redis_url,
     backend=redis_url,
     include=[

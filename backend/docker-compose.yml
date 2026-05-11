@@ -4,6 +4,11 @@ services:
     container_name: datn-redis
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - datn-network
     restart: unless-stopped
@@ -19,10 +24,65 @@ services:
       - .env
     environment:
       REDIS_URL: redis://redis:6379/0
+      DOCUMENT_PROCESSING_MODE: worker
+      UPLOADS_DIR: /app/uploads
     depends_on:
-      - redis
+      redis:
+        condition: service_healthy
     volumes:
       - ./app:/app/app
+      - ./config.yaml:/app/config.yaml:ro
+      - ./models:/app/models:ro
+      - datn-uploads:/app/uploads
+    networks:
+      - datn-network
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: datn-worker
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DOCUMENT_PROCESSING_MODE: worker
+      UPLOADS_DIR: /app/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./app:/app/app
+      - ./config.yaml:/app/config.yaml:ro
+      - ./models:/app/models:ro
+      - datn-uploads:/app/uploads
+    networks:
+      - datn-network
+    restart: unless-stopped
+
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: datn-flower
+    profiles:
+      - monitoring
+    command: ["uv", "run", "celery", "-A", "app.workers.celery_app", "flower", "--port=5555"]
+    env_file:
+      - .env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./app:/app/app
+      - ./config.yaml:/app/config.yaml:ro
+      - ./models:/app/models:ro
+      - datn-uploads:/app/uploads
     networks:
       - datn-network
     restart: unless-stopped
@@ -30,3 +90,6 @@ services:
 networks:
   datn-network:
     driver: bridge
+
+volumes:
+  datn-uploads:

@@ -1,4 +1,4 @@
-# Backend API with uv-managed Python dependencies
+# Celery worker for DATN notebook RAG processing
 FROM python:3.12-slim
 
 WORKDIR /app
@@ -25,18 +25,10 @@ COPY app ./app
 COPY config.yaml ./
 COPY models ./models
 
-RUN mkdir -p /app/uploads
-
-RUN chown -R appuser:appuser /app /home/appuser
+RUN mkdir -p /app/uploads && chown -R appuser:appuser /app /home/appuser
 
 USER appuser
 
-EXPOSE 8000
-
-CMD ["uv", "run", "gunicorn", "app.main:app", \
-     "--workers", "1", \
-     "--worker-class", "uvicorn.workers.UvicornWorker", \
-     "--bind", "0.0.0.0:8000", \
-     "--timeout", "120", \
-     "--access-logfile", "-", \
-     "--error-logfile", "-"]
+CMD ["uv", "run", "celery", "-A", "app.workers.celery_app", "worker", \
+     "--loglevel=info", \
+     "--concurrency=2"]

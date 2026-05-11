@@ -50,6 +50,24 @@ export function useDocuments(notebookId?: string) {
     }
   }, [load])
 
+  useEffect(() => {
+    const hasProcessingSources = notebook?.sources.some(
+      (source) => source.status === 'pending' || source.status === 'processing',
+    )
+
+    if (!notebookId || !hasProcessingSources) {
+      return undefined
+    }
+
+    const intervalId = window.setInterval(() => {
+      void load()
+    }, 5000)
+
+    return () => {
+      window.clearInterval(intervalId)
+    }
+  }, [load, notebook?.sources, notebookId])
+
   const createNotebook = async () => {
     const created = await documentService.createNotebook()
     const refreshedSummaries = await documentService.getNotebookSummaries()
