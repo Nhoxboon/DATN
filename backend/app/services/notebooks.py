@@ -137,12 +137,13 @@ class NotebookWorkspaceService:
         file_content: bytes,
         filename: str,
     ) -> dict[str, Any]:
-        self._require_notebook(user_id, notebook_id)
+        notebook = self._require_notebook(user_id, notebook_id)
         document_name = document_name_from_filename(filename)
         status_repo = get_processing_status_repository(self.client)
 
         try:
             settings = get_settings()
+            self._auto_title_from_first_upload(user_id, notebook_id, notebook, document_name)
             if settings.document_processing_mode.lower() == "worker":
                 task_id = str(uuid4())
                 upload_dir = Path(settings.uploads_dir) / user_id / notebook_id
@@ -448,6 +449,42 @@ class NotebookWorkspaceService:
         if missing:
             raise NotebookValidationError(f"These documents are not ready for chat: {', '.join(missing)}")
         return unique_names
+
+    def _auto_title_from_first_upload(
+        self,
+        user_id: str,
+        notebook_id: str,
+        notebook: dict[str, Any],
+        document_name: str,
+    ) -> None:
+        title = str(notebook.get("title") or "").strip()
+        if title and title.lower() != "untitled notebook":
+            return
+
+        existing = (
+            self.client.table("document_processing_status")
+            .select("id")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        if isinstance(existing.data, list) and existing.data:
+            return
+
+        (
+            self.client.table("notebooks")
+            .update({"title": document_name, "updated_at": _utc_now()})
+            .eq("id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        logger.info(
+            "Auto-renamed first-upload notebook notebook_id=%s user_id=%s title=%s",
+            notebook_id,
+            user_id,
+            document_name,
+        )
 
     def _answer_with_fallback_citations(self, answer: str, sources: list[dict[str, Any]]) -> str:
         if not sources or CITATION_PATTERN.search(answer):

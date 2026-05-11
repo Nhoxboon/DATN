@@ -177,6 +177,38 @@ class NotebookWorkspaceTests(unittest.TestCase):
         with self.assertRaises(NotebookNotFoundError):
             self.service.get_notebook("other-user", "notebook-1")
 
+    def test_first_upload_auto_renames_untitled_notebook(self) -> None:
+        notebook = self.client.insert_row(
+            "notebooks",
+            {
+                "id": "notebook-untitled",
+                "user_id": "user-1",
+                "title": "Untitled Notebook",
+                "description": None,
+            },
+        )
+
+        self.service._auto_title_from_first_upload(
+            "user-1",
+            "notebook-untitled",
+            notebook,
+            "State Machine Diagram",
+        )
+
+        renamed = self.service.get_notebook("user-1", "notebook-untitled")
+        self.assertEqual(renamed.title, "State Machine Diagram")
+
+    def test_first_upload_does_not_override_existing_title(self) -> None:
+        self.service._auto_title_from_first_upload(
+            "user-1",
+            "notebook-1",
+            self.notebook,
+            "State Machine Diagram",
+        )
+
+        unchanged = self.service.get_notebook("user-1", "notebook-1")
+        self.assertEqual(unchanged.title, "Research notebook")
+
     def test_current_chat_reloads_until_new_chat_clears_it(self) -> None:
         session_id, messages = self.service.get_current_chat("user-1", "notebook-1")
         self.assertEqual(messages, [])

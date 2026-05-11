@@ -99,6 +99,24 @@ export function useDocuments(notebookId?: string) {
     setSummaries((current) => current.filter((summary) => summary.id !== id))
   }
 
+  const renameNotebook = async (id: string, title: string) => {
+    const renamed = await documentService.updateNotebook(id, { title })
+    setNotebook((current) => (current?.id === id ? renamed : current))
+    setSummaries((current) =>
+      current.map((summary) =>
+        summary.id === id
+          ? {
+              ...summary,
+              title: renamed.title,
+              updatedAt: renamed.updatedAt,
+              description: renamed.description,
+            }
+          : summary,
+      ),
+    )
+    return renamed
+  }
+
   const processUploads = async (files: File[]) => {
     if (!notebookId || !files.length) {
       return
@@ -168,6 +186,7 @@ export function useDocuments(notebookId?: string) {
     notebook,
     createNotebook,
     deleteNotebook,
+    renameNotebook,
     processUploads,
     addStudioDocument,
     reload: load,

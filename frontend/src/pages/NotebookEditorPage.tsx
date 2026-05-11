@@ -1,4 +1,4 @@
-import { X } from 'lucide-react'
+import { Check, Pencil, X } from 'lucide-react'
 import { useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ProfileMenu } from '../components/layout/ProfileMenu'
@@ -25,7 +25,10 @@ export function NotebookEditorPage() {
   const [activeNote, setActiveNote] = useState<StudioDocument | null>(null)
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null)
   const [noteError, setNoteError] = useState<string | null>(null)
-  const { loading, notebook, processUploads, profile, addStudioDocument, error: documentError } = useDocuments(notebookId)
+  const [editingTitle, setEditingTitle] = useState(false)
+  const [titleDraft, setTitleDraft] = useState('')
+  const [renaming, setRenaming] = useState(false)
+  const { loading, notebook, processUploads, profile, addStudioDocument, renameNotebook, error: documentError } = useDocuments(notebookId)
   const { messages, isPending, error: chatError, sendMessage, newChat, saveNote } = useChatManager(notebookId)
 
   const completedSourceNames =
@@ -54,6 +57,42 @@ export function NotebookEditorPage() {
 
   const closeModal = () => {
     setSearchParams({})
+  }
+
+  const startEditingTitle = () => {
+    if (!notebook) {
+      return
+    }
+
+    setTitleDraft(notebook.title)
+    setEditingTitle(true)
+  }
+
+  const cancelEditingTitle = () => {
+    setTitleDraft('')
+    setEditingTitle(false)
+  }
+
+  const submitTitle = async () => {
+    if (!notebook || renaming) {
+      return
+    }
+
+    const nextTitle = titleDraft.trim()
+    if (!nextTitle || nextTitle === notebook.title) {
+      cancelEditingTitle()
+      return
+    }
+
+    setRenaming(true)
+    try {
+      await renameNotebook(notebook.id, nextTitle)
+      cancelEditingTitle()
+    } catch (err) {
+      setNoteError((err as Error).message)
+    } finally {
+      setRenaming(false)
+    }
   }
 
   const handleProcessUploads = (files: File[]) => {
@@ -126,9 +165,41 @@ export function NotebookEditorPage() {
             >
               The Scholarly Curator
             </button>
-            <div className="truncate text-[0.68rem] text-muted">
-              {notebook?.title ?? 'Notebook Editor & Chat'}
-            </div>
+            {editingTitle ? (
+              <div className="flex min-w-0 items-center gap-2">
+                <input
+                  autoFocus
+                  value={titleDraft}
+                  disabled={renaming}
+                  onChange={(event) => setTitleDraft(event.target.value)}
+                  onBlur={() => {
+                    void submitTitle()
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault()
+                      void submitTitle()
+                    }
+                    if (event.key === 'Escape') {
+                      event.preventDefault()
+                      cancelEditingTitle()
+                    }
+                  }}
+                  className="h-7 min-w-0 max-w-[260px] rounded-md border border-outline/60 bg-white px-2 text-[0.76rem] text-ink outline-none focus:border-primary"
+                />
+                <Check className="h-3.5 w-3.5 text-primary" />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onDoubleClick={startEditingTitle}
+                title="Double click to rename"
+                className="group flex min-w-0 items-center gap-1.5 text-left text-[0.68rem] text-muted"
+              >
+                <span className="truncate">{notebook?.title ?? 'Notebook Editor & Chat'}</span>
+                <Pencil className="h-3 w-3 opacity-0 transition group-hover:opacity-70" />
+              </button>
+            )}
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -171,7 +242,6 @@ export function NotebookEditorPage() {
 
           <section className="flex min-h-0 flex-col border-x border-black/10 bg-white">
             <div className="flex-1 overflow-y-auto">
-              <SynthesisCard notebook={notebook} />
               <div className="px-6 pb-4 sm:px-7">
                 {isPending && (
                   <div className="mb-3 text-[0.58rem] uppercase tracking-[0.14em] text-muted">
@@ -183,7 +253,12 @@ export function NotebookEditorPage() {
                     {editorError}
                   </div>
                 )}
-                <ChatMessageList messages={messages} onSaveNote={handleSaveNote} savingNoteId={savingNoteId} />
+                <ChatMessageList
+                  messages={messages}
+                  intro={<SynthesisCard notebook={notebook} />}
+                  onSaveNote={handleSaveNote}
+                  savingNoteId={savingNoteId}
+                />
               </div>
             </div>
             <ChatComposer

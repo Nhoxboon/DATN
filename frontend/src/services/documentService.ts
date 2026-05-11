@@ -128,6 +128,14 @@ export const documentService = {
     })
   },
 
+  async updateNotebook(notebookId: string, payload: { title?: string; description?: string | null }): Promise<NotebookDetail> {
+    const data = await apiFetch<BackendNotebookDetail>(`/notebooks/${encodeURIComponent(notebookId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    })
+    return toDetail(data)
+  },
+
   async getNotebookDetail(notebookId: string): Promise<NotebookDetail | null> {
     const data = await apiFetch<BackendNotebookDetail>(`/notebooks/${encodeURIComponent(notebookId)}`)
     return toDetail(data)

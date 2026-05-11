@@ -10,7 +10,7 @@ import { useAuth } from '../hooks/useAuth'
 export function DashboardPage() {
   const navigate = useNavigate()
   const { signOut } = useAuth()
-  const { loading, summaries, profile, createNotebook, deleteNotebook, error } = useDocuments()
+  const { loading, summaries, profile, createNotebook, deleteNotebook, renameNotebook, error } = useDocuments()
   const avatarRef = useRef<HTMLButtonElement | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
 
@@ -31,6 +31,17 @@ export function DashboardPage() {
     }
 
     await deleteNotebook(id)
+  }
+
+  const handleRenameNotebook = async (id: string) => {
+    const notebook = summaries.find((item) => item.id === id)
+    const nextTitle = window.prompt('Rename notebook', notebook?.title ?? '')
+
+    if (!nextTitle?.trim()) {
+      return
+    }
+
+    await renameNotebook(id, nextTitle.trim())
   }
 
   return (
@@ -96,6 +107,9 @@ export function DashboardPage() {
                 key={notebook.id}
                 notebook={notebook}
                 onOpen={(id) => navigate(`/notebooks/${id}`)}
+                onRename={(id) => {
+                  void handleRenameNotebook(id)
+                }}
                 onDelete={(id) => {
                   void handleDeleteNotebook(id)
                 }}

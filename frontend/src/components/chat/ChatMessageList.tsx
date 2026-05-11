@@ -1,4 +1,4 @@
-import { BookmarkCheck, BookMarked } from 'lucide-react'
+import { Bookmark, BookmarkCheck } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -7,6 +7,7 @@ import { useScrollToBottom } from '../../hooks/useScrollToBottom'
 
 interface ChatMessageListProps {
   messages: ChatMessage[]
+  intro?: ReactNode
   onSaveNote?: (assistantMessageId: string) => void
   savingNoteId?: string | null
 }
@@ -142,11 +143,12 @@ function renderMessageContent(message: ChatMessage) {
   return parts.length ? parts : <span className="whitespace-pre-wrap">{message.content}</span>
 }
 
-export function ChatMessageList({ messages, onSaveNote, savingNoteId }: ChatMessageListProps) {
+export function ChatMessageList({ messages, intro, onSaveNote, savingNoteId }: ChatMessageListProps) {
   const scrollRef = useScrollToBottom(messages)
 
   return (
     <div ref={scrollRef} className="max-h-[320px] space-y-4 overflow-y-auto pr-1">
+      {intro}
       {messages.map((message) => {
         const isAssistant = message.role === 'assistant'
 
@@ -181,10 +183,10 @@ export function ChatMessageList({ messages, onSaveNote, savingNoteId }: ChatMess
                 type="button"
                 onClick={() => onSaveNote(message.id)}
                 disabled={message.saved || savingNoteId === message.id}
-                className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white px-3 py-2 text-[0.7rem] font-semibold text-primary transition hover:bg-white/80 disabled:cursor-default disabled:text-muted"
+                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-outline/50 bg-white px-3.5 py-2 text-[0.7rem] font-semibold text-primary transition hover:bg-white/80 disabled:cursor-default disabled:text-primary/55"
               >
-                {message.saved ? <BookmarkCheck className="h-3.5 w-3.5" /> : <BookMarked className="h-3.5 w-3.5" />}
-                {message.saved ? 'Đã lưu vào sổ ghi chú' : savingNoteId === message.id ? 'Đang lưu...' : 'Lưu vào sổ ghi chú'}
+                {message.saved ? <BookmarkCheck className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />}
+                {message.saved ? 'Saved to note' : savingNoteId === message.id ? 'Saving...' : 'Save to note'}
               </button>
             )}
           </article>
