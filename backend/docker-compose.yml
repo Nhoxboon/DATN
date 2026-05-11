@@ -25,6 +25,7 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       DOCUMENT_PROCESSING_MODE: worker
+      DATN_REQUIRE_WORKER_MODE: "true"
       UPLOADS_DIR: /app/uploads
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
@@ -57,6 +58,7 @@ services:
     environment:
       REDIS_URL: redis://redis:6379/0
       DOCUMENT_PROCESSING_MODE: worker
+      DATN_REQUIRE_WORKER_MODE: "true"
       UPLOADS_DIR: /app/uploads
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility

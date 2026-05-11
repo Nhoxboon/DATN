@@ -31,4 +31,5 @@ USER appuser
 
 CMD ["uv", "run", "celery", "-A", "app.workers.celery_app", "worker", \
      "--loglevel=info", \
-     "--concurrency=2"]
+     "--concurrency=2", \
+     "-Q", "document_processing,embedding,storage"]

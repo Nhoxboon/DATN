@@ -1,12 +1,15 @@
 """Celery application configuration."""
 
+import logging
 import multiprocessing
 multiprocessing.set_start_method('spawn', force=True)
 
 from celery import Celery
+from celery.signals import worker_ready
 from app.core.config import get_settings
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 # Use single Redis DB with key prefixes
 redis_url = settings.redis_url
@@ -56,3 +59,14 @@ celery_app.conf.result_backend_transport_options = {
         "timeout": 5.0
     }
 }
+
+
+@worker_ready.connect
+def log_worker_ready(sender=None, **_kwargs):
+    logger.info(
+        "DATN worker ready: document_processing_mode=%s redis_url=%s uploads_dir=%s queues=%s",
+        settings.document_processing_mode,
+        settings.redis_url,
+        settings.uploads_dir,
+        "document_processing,embedding,storage",
+    )

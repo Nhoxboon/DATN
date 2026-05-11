@@ -53,6 +53,25 @@ docker compose down
 ```
 
 The Docker Compose setup loads `backend/.env`, starts Redis as the `redis` service, and overrides `REDIS_URL` to `redis://redis:6379/0` inside the backend container.
+Docker Compose also forces `DOCUMENT_PROCESSING_MODE=worker` and `DATN_REQUIRE_WORKER_MODE=true`, so production-style document indexing fails fast if it is not routed through Celery.
+
+## RAG Chunking Debug
+
+Use the read-only chunking debug command to compare DATN and `pdp8-rag` without writing to Supabase:
+
+```bash
+cd backend
+uv run python scripts/debug_chunking.py /path/to/file.pdf
+```
+
+Run the same processor from the `pdp8-rag` environment:
+
+```bash
+cd ../pdp8-rag
+uv run python ../backend/scripts/debug_chunking.py /path/to/file.pdf --project-root .
+```
+
+The command prints markdown length, first/last text, chunk count, chunk ids, token counts, page metadata, and chunk snippets.
 
 ## Local Ports
 
