@@ -1,5 +1,6 @@
 """Notebook workspace routes."""
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -29,6 +30,7 @@ from app.services.notebooks import (
 
 
 router = APIRouter(prefix="/notebooks", tags=["notebooks"])
+logger = logging.getLogger(__name__)
 
 
 def get_workspace_service(
@@ -52,6 +54,7 @@ async def list_notebooks(
     service: NotebookWorkspaceService = Depends(get_workspace_service),
 ) -> list[NotebookSummary]:
     """List notebooks owned by the current user."""
+    logger.info("GET /notebooks user_id=%s", current_user.id)
     return service.list_notebooks(current_user.id)
 
 
@@ -77,6 +80,7 @@ async def get_notebook(
 ) -> NotebookDetail:
     """Get a notebook owned by the current user."""
     try:
+        logger.info("GET /notebooks/%s user_id=%s", notebook_id, current_user.id)
         return service.get_notebook(current_user.id, notebook_id)
     except Exception as exc:
         _handle_notebook_error(exc)
@@ -138,8 +142,22 @@ async def upload_document(
 
     try:
         content = await file.read()
+        logger.info(
+            "POST /notebooks/%s/documents/upload user_id=%s filename=%s bytes=%s",
+            notebook_id,
+            current_user.id,
+            file.filename,
+            len(content),
+        )
         result = service.upload_document(current_user.id, notebook_id, content, file.filename)
         documents = service.list_documents(current_user.id, notebook_id)
+        logger.info(
+            "POST /notebooks/%s/documents/upload completed document=%s queued=%s chunks=%s",
+            notebook_id,
+            result["document_name"],
+            bool(result.get("queued", False)),
+            result["chunks_processed"],
+        )
         return DocumentUploadResponse(
             status="success",
             document_name=str(result["document_name"]),
@@ -194,6 +212,12 @@ async def send_chat_message(
 ) -> ChatSendResponse:
     """Save a user question, answer it with notebook-scoped RAG, and save the AI reply."""
     try:
+        logger.info(
+            "POST /notebooks/%s/chat/messages user_id=%s selected_documents=%s",
+            notebook_id,
+            current_user.id,
+            payload.document_names,
+        )
         result = service.send_chat_message(
             current_user.id,
             notebook_id,

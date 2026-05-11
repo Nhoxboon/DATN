@@ -6,7 +6,7 @@ import { usePortal } from '../../hooks/usePortal'
 interface AddSourcesModalProps {
   open: boolean
   onClose: () => void
-  onProcess: (files: File[]) => Promise<void>
+  onProcess: (files: File[]) => void
 }
 
 function sizeLabel(file: File) {
@@ -18,7 +18,6 @@ export function AddSourcesModal({ open, onClose, onProcess }: AddSourcesModalPro
   const portalTarget = usePortal()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [files, setFiles] = useState<File[]>([])
-  const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   if (!open || !portalTarget) {
@@ -42,18 +41,11 @@ export function AddSourcesModal({ open, onClose, onProcess }: AddSourcesModalPro
     setFiles((current) => current.filter((item) => item !== file))
   }
 
-  const handleProcess = async () => {
-    setIsProcessing(true)
+  const handleProcess = () => {
     setError(null)
 
-    try {
-      await onProcess(files)
-      setFiles([])
-    } catch (err) {
-      setError((err as Error).message)
-    } finally {
-      setIsProcessing(false)
-    }
+    onProcess(files)
+    setFiles([])
   }
 
   return createPortal(
@@ -156,10 +148,10 @@ export function AddSourcesModal({ open, onClose, onProcess }: AddSourcesModalPro
             <button
               type="button"
               onClick={handleProcess}
-              disabled={!files.length || isProcessing}
+              disabled={!files.length}
               className="inline-flex h-8 items-center justify-center rounded-[8px] bg-primary px-4 text-[0.68rem] font-semibold text-white transition hover:brightness-105 disabled:opacity-60"
             >
-              {isProcessing ? 'Indexing...' : 'Process Sources'}
+              Process Sources
             </button>
           </div>
         </div>

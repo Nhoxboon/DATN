@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { NotebookDetail, NotebookSummary, UserProfile } from '../types'
+import type { NotebookDetail, NotebookSummary, SourceItem, UserProfile } from '../types'
 import { documentService } from '../services/documentService'
 import { buildUserProfile } from '../services/authService'
 import { useAuth } from './useAuth'
@@ -12,8 +12,10 @@ export function useDocuments(notebookId?: string) {
   const [notebook, setNotebook] = useState<NotebookDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
+  const load = useCallback(async (options?: { silent?: boolean }) => {
+    if (!options?.silent) {
+      setLoading(true)
+    }
     setError(null)
 
     try {
@@ -27,11 +29,28 @@ export function useDocuments(notebookId?: string) {
       setNotebook(notebookData)
     } catch (err) {
       setError((err as Error).message)
-      setNotebook(null)
+      if (!options?.silent) {
+        setNotebook(null)
+      }
     } finally {
-      setLoading(false)
+      if (!options?.silent) {
+        setLoading(false)
+      }
     }
   }, [notebookId, user])
+
+  const refreshNotebook = useCallback(async () => {
+    if (!notebookId) {
+      return
+    }
+
+    try {
+      setError(null)
+      setNotebook(await documentService.getNotebookDetail(notebookId))
+    } catch (err) {
+      setError((err as Error).message)
+    }
+  }, [notebookId])
 
   useEffect(() => {
     let cancelled = false
@@ -60,13 +79,13 @@ export function useDocuments(notebookId?: string) {
     }
 
     const intervalId = window.setInterval(() => {
-      void load()
+      void refreshNotebook()
     }, 5000)
 
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [load, notebook?.sources, notebookId])
+  }, [notebook?.sources, notebookId, refreshNotebook])
 
   const createNotebook = async () => {
     const created = await documentService.createNotebook()
@@ -85,14 +104,49 @@ export function useDocuments(notebookId?: string) {
       return
     }
 
-    let updatedNotebook: NotebookDetail | null = notebook
-    for (const file of files) {
-      updatedNotebook = await documentService.uploadDocument(notebookId, file)
-    }
+    const optimisticSources: SourceItem[] = files.map((file) => ({
+      id: `uploading-${file.name}-${file.size}-${file.lastModified}`,
+      name: file.name.replace(/\.pdf$/i, ''),
+      kind: 'pdf',
+      meta: 'Indexing - queued',
+      selected: false,
+      status: 'pending',
+    }))
 
-    const refreshedSummaries = await documentService.getNotebookSummaries()
-    setNotebook(updatedNotebook)
-    setSummaries(refreshedSummaries)
+    setError(null)
+    setNotebook((current) =>
+      current
+        ? {
+            ...current,
+            sources: [
+              ...optimisticSources.filter(
+                (source) => !current.sources.some((existing) => existing.name === source.name),
+              ),
+              ...current.sources,
+            ],
+          }
+        : current,
+    )
+
+    try {
+      let updatedNotebook: NotebookDetail | null = notebook
+      for (const file of files) {
+        updatedNotebook = await documentService.uploadDocument(notebookId, file)
+        if (updatedNotebook) {
+          setNotebook(updatedNotebook)
+        }
+      }
+
+      const [refreshedSummaries, refreshedNotebook] = await Promise.all([
+        documentService.getNotebookSummaries(),
+        documentService.getNotebookDetail(notebookId),
+      ])
+      setNotebook(refreshedNotebook)
+      setSummaries(refreshedSummaries)
+    } catch (err) {
+      setError((err as Error).message)
+      void refreshNotebook()
+    }
   }
 
   const addStudioDocument = (document: NotebookDetail['studioDocuments'][number]) => {

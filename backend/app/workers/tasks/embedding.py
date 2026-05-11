@@ -1,5 +1,6 @@
 """Embedding generation Celery tasks."""
 
+import logging
 from typing import Dict, Any
 from app.workers.celery_app import celery_app
 from app.workers.middleware.circuit_breaker import circuit_breaker, CircuitBreakerOpen
@@ -8,6 +9,9 @@ from app.core.config import get_settings
 from app.services.embedding import EmbeddingService
 from app.db.dependencies import get_supabase_client
 from app.db.repository import get_document_repository
+
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, max_retries=5, default_retry_delay=30)
@@ -48,6 +52,14 @@ def generate_embedding_and_store_task(
         # Generate embedding
         embedding_service = EmbeddingService(settings)
         embedding = embedding_service.embed_text(chunk_data["text"])
+        logger.info(
+            "Worker embedding generated notebook_id=%s document=%s chunk_id=%s pages=%s chars=%s",
+            notebook_id,
+            document_name,
+            chunk_data["chunk_id"],
+            chunk_data.get("page_range"),
+            len(chunk_data["text"]),
+        )
 
         # Store in database
         supabase_client = get_supabase_client()
@@ -85,5 +97,10 @@ def generate_embedding_and_store_task(
 
     except Exception as e:
         # Log error and retry
-        print(f"Error processing chunk {chunk_data['chunk_id']}: {str(e)}")
+        logger.exception(
+            "Error processing chunk notebook_id=%s document=%s chunk_id=%s",
+            notebook_id,
+            document_name,
+            chunk_data["chunk_id"],
+        )
         raise self.retry(exc=e)

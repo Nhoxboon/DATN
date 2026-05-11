@@ -38,5 +38,6 @@ CMD ["uv", "run", "gunicorn", "app.main:app", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
      "--bind", "0.0.0.0:8000", \
      "--timeout", "120", \
+     "--log-level", "info", \
      "--access-logfile", "-", \
      "--error-logfile", "-"]

@@ -1,5 +1,6 @@
 """Document processing Celery tasks."""
 
+import logging
 from typing import Any, cast
 from celery import chord, group
 from app.workers.celery_app import celery_app
@@ -15,6 +16,9 @@ from app.db.repository import get_document_repository
 from app.workers.tasks.embedding import generate_embedding_and_store_task
 from app.workers.tasks.storage import finalize_document_task
 from app.core.document_naming import safe_pdf_storage_path
+
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
@@ -42,6 +46,14 @@ def process_document_task(self, notebook_id: str, user_id: str, document_name: s
     try:
         # Acquire distributed lock to prevent duplicate processing
         with distributed_lock(f"document:{notebook_id}:{document_name}", timeout=3600):
+            logger.info(
+                "Worker document processing started notebook_id=%s user_id=%s document=%s task_id=%s file_path=%s",
+                notebook_id,
+                user_id,
+                document_name,
+                self.request.id,
+                file_path,
+            )
             # Create processing status
             status_repo.create_status(
                 notebook_id=notebook_id,
@@ -74,6 +86,11 @@ def process_document_task(self, notebook_id: str, user_id: str, document_name: s
             }
 
     except CircuitBreakerOpen as e:
+        logger.exception(
+            "Worker document processing circuit open notebook_id=%s document=%s",
+            notebook_id,
+            document_name,
+        )
         status_repo.update_status(
             notebook_id,
             document_name,
@@ -83,6 +100,11 @@ def process_document_task(self, notebook_id: str, user_id: str, document_name: s
         raise self.retry(exc=e)
 
     except Exception as e:
+        logger.exception(
+            "Worker document processing failed notebook_id=%s document=%s",
+            notebook_id,
+            document_name,
+        )
         status_repo.update_status(
             notebook_id,
             document_name,
@@ -111,15 +133,36 @@ def extract_and_chunk_task(self, notebook_id: str, user_id: str, document_name: 
     app_config = get_app_config()
 
     try:
+        logger.info(
+            "Worker extract/chunk started notebook_id=%s user_id=%s document=%s file_path=%s",
+            notebook_id,
+            user_id,
+            document_name,
+            file_path,
+        )
         # Initialize services with DI
         embedding_service = EmbeddingService(settings)
         pdf_processor = PDFProcessor(app_config, settings, embedding_service)
 
         # Process PDF
         markdown_content, metadata = pdf_processor.process_pdf(file_path)
+        logger.info(
+            "Worker PDF extracted notebook_id=%s document=%s markdown_chars=%s pages=%s images=%s",
+            notebook_id,
+            document_name,
+            len(markdown_content),
+            metadata.get("total_pages"),
+            metadata.get("image_count", 0),
+        )
 
         # Chunk with page preservation
         chunks = pdf_processor.chunk_text_with_pages(markdown_content, metadata)
+        logger.info(
+            "Worker chunking completed notebook_id=%s document=%s chunks=%s",
+            notebook_id,
+            document_name,
+            len(chunks),
+        )
 
         supabase_client = get_supabase_client()
         status_repo = get_processing_status_repository(supabase_client)
@@ -166,6 +209,11 @@ def extract_and_chunk_task(self, notebook_id: str, user_id: str, document_name: 
         }
 
     except Exception as e:
+        logger.exception(
+            "Worker extract/chunk failed notebook_id=%s document=%s",
+            notebook_id,
+            document_name,
+        )
         supabase_client = get_supabase_client()
         status_repo = get_processing_status_repository(supabase_client)
         status_repo.update_status(

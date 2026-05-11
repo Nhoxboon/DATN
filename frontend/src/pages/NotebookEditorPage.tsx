@@ -56,9 +56,9 @@ export function NotebookEditorPage() {
     setSearchParams({})
   }
 
-  const handleProcessUploads = async (files: File[]) => {
-    await processUploads(files)
+  const handleProcessUploads = (files: File[]) => {
     closeModal()
+    void processUploads(files)
   }
 
   const handleToggleSource = (name: string) => {

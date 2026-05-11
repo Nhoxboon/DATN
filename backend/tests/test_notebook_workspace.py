@@ -204,8 +204,9 @@ class NotebookWorkspaceTests(unittest.TestCase):
 
         self.assertEqual(rag_service.seen["notebook_id"], "notebook-1")
         self.assertEqual(rag_service.seen["doc_names"], ["doc-a", "doc-b"])
-        self.assertEqual(result["answer"], "Indexed answer")
+        self.assertEqual(result["answer"], "Indexed answer\n\nNguồn: [1]")
         self.assertEqual(len(result["messages"]), 2)
+        self.assertEqual(result["messages"][1].content, "Indexed answer\n\nNguồn: [1]")
 
     def test_selected_documents_must_be_completed(self) -> None:
         self.add_document("ready")

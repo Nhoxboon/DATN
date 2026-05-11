@@ -1,5 +1,6 @@
 """Document management service."""
 
+import logging
 import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
@@ -13,6 +14,9 @@ from app.core.document_naming import (
 from app.services.pdf_processor.processor import PDFProcessor
 from app.services.embedding import EmbeddingService
 from app.db.repository import DocumentRepository
+
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentService:
@@ -113,8 +117,29 @@ class DocumentService:
         public_url = self.supabase_client.storage.from_(self.storage_bucket).get_public_url(storage_path)
 
         # Process PDF into markdown, then chunk while preserving page metadata.
+        logger.info(
+            "RAG upload started notebook_id=%s user_id=%s document=%s path=%s",
+            notebook_id,
+            user_id,
+            document_name,
+            file_path,
+        )
         markdown_content, metadata = self.pdf_processor.process_pdf(file_path)
+        logger.info(
+            "RAG PDF extracted document=%s notebook_id=%s markdown_chars=%s pages=%s images=%s",
+            document_name,
+            notebook_id,
+            len(markdown_content),
+            metadata.get("total_pages"),
+            metadata.get("image_count", 0),
+        )
         chunks = self.pdf_processor.chunk_text_with_pages(markdown_content, metadata)
+        logger.info(
+            "RAG chunking completed document=%s notebook_id=%s chunks=%s",
+            document_name,
+            notebook_id,
+            len(chunks),
+        )
 
         # Replace existing chunks for this document so re-indexing does not
         # leave stale text-only chunks alongside image-aware chunks.
@@ -124,6 +149,14 @@ class DocumentService:
         for chunk in chunks:
             chunk_content = chunk["text"]
             embedding = self.embedding_service.embed_text(chunk_content)
+            logger.info(
+                "RAG embedding chunk document=%s notebook_id=%s chunk_id=%s pages=%s chars=%s",
+                document_name,
+                notebook_id,
+                chunk["chunk_id"],
+                chunk.get("page_range"),
+                len(chunk_content),
+            )
             self.doc_repository.insert_chunk(
                 notebook_id=notebook_id,
                 user_id=user_id,
@@ -149,6 +182,12 @@ class DocumentService:
                 page_range=chunk.get("page_range")
             )
 
+        logger.info(
+            "RAG upload finished document=%s notebook_id=%s chunks=%s",
+            document_name,
+            notebook_id,
+            len(chunks),
+        )
         return {
             "document_name": document_name,
             "chunks_processed": len(chunks),

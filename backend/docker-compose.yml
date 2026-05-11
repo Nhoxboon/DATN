@@ -26,6 +26,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       DOCUMENT_PROCESSING_MODE: worker
       UPLOADS_DIR: /app/uploads
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     depends_on:
       redis:
         condition: service_healthy
@@ -34,6 +36,13 @@ services:
       - ./config.yaml:/app/config.yaml:ro
       - ./models:/app/models:ro
       - datn-uploads:/app/uploads
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     networks:
       - datn-network
     restart: unless-stopped
@@ -49,6 +58,8 @@ services:
       REDIS_URL: redis://redis:6379/0
       DOCUMENT_PROCESSING_MODE: worker
       UPLOADS_DIR: /app/uploads
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
     depends_on:
       redis:
         condition: service_healthy
@@ -57,6 +68,13 @@ services:
       - ./config.yaml:/app/config.yaml:ro
       - ./models:/app/models:ro
       - datn-uploads:/app/uploads
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     networks:
       - datn-network
     restart: unless-stopped

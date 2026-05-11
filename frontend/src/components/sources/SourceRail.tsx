@@ -1,4 +1,4 @@
-import { Check, PanelLeft, Plus } from 'lucide-react'
+import { Check, Loader2, PanelLeft, Plus } from 'lucide-react'
 import type { SourceItem } from '../../types'
 
 interface SourceRailProps {
@@ -45,7 +45,10 @@ export function SourceRail({ sources, onAddSource, onToggleSource, onToggleAllSo
       </button>
 
       <div className="space-y-4">
-        {sources.map((source) => (
+        {sources.map((source) => {
+          const isIndexing = source.status === 'pending' || source.status === 'processing'
+
+          return (
           <button
             key={source.id}
             type="button"
@@ -56,12 +59,18 @@ export function SourceRail({ sources, onAddSource, onToggleSource, onToggleAllSo
             <div className="flex items-start gap-3">
               <span
                 className={`mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-[4px] border ${
-                  source.selected
+                  isIndexing
+                    ? 'border-outline bg-white text-primary'
+                    : source.selected
                     ? 'border-primary bg-primary text-white'
                     : 'border-outline bg-transparent text-transparent'
                 }`}
               >
-                <Check className="h-3 w-3" strokeWidth={3} />
+                {isIndexing ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Check className="h-3 w-3" strokeWidth={3} />
+                )}
               </span>
               <div className="min-w-0">
                 <div
@@ -84,7 +93,8 @@ export function SourceRail({ sources, onAddSource, onToggleSource, onToggleAllSo
               </div>
             </div>
           </button>
-        ))}
+          )
+        })}
       </div>
     </aside>
   )

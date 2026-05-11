@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,10 @@ from app.schemas.notebooks import (
     NotebookSummary,
 )
 from app.services.documents import get_document_service
+
+
+logger = logging.getLogger(__name__)
+CITATION_PATTERN = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
 
 
 class NotebookNotFoundError(ValueError):
@@ -143,6 +149,15 @@ class NotebookWorkspaceService:
                 upload_dir.mkdir(parents=True, exist_ok=True)
                 file_path = upload_dir / safe_pdf_storage_path(document_name)
                 file_path.write_bytes(file_content)
+                logger.info(
+                    "Queued notebook document upload notebook_id=%s user_id=%s document=%s task_id=%s path=%s bytes=%s",
+                    notebook_id,
+                    user_id,
+                    document_name,
+                    task_id,
+                    file_path,
+                    len(file_content),
+                )
 
                 from app.workers.tasks.document import process_document_task
 
@@ -174,6 +189,13 @@ class NotebookWorkspaceService:
             )
             status_repo.update_status(notebook_id, document_name, ProcessingStatus.PROCESSING)
             service = get_document_service()
+            logger.info(
+                "Starting sync notebook document upload notebook_id=%s user_id=%s document=%s bytes=%s",
+                notebook_id,
+                user_id,
+                document_name,
+                len(file_content),
+            )
             result = service.upload_from_bytes(
                 notebook_id=notebook_id,
                 user_id=user_id,
@@ -190,8 +212,21 @@ class NotebookWorkspaceService:
                 total_chunks=chunks_processed,
             )
             self._touch_notebook(user_id, notebook_id)
+            logger.info(
+                "Completed sync notebook document upload notebook_id=%s user_id=%s document=%s chunks=%s",
+                notebook_id,
+                user_id,
+                document_name,
+                chunks_processed,
+            )
             return result
         except Exception as exc:
+            logger.exception(
+                "Notebook document upload failed notebook_id=%s user_id=%s document=%s",
+                notebook_id,
+                user_id,
+                document_name,
+            )
             status_repo.update_status(
                 notebook_id,
                 document_name,
@@ -241,18 +276,20 @@ class NotebookWorkspaceService:
             notebook_id=notebook_id,
             doc_names=selected_documents,
         )
+        sources = result.get("sources", [])
+        answer = self._answer_with_fallback_citations(str(result["answer"]), sources)
         session = self._get_or_create_session(user_id, notebook_id)
         session_id = str(session["id"])
         self._insert_message(session_id, "user", message.strip(), [])
-        self._insert_message(session_id, "assistant", str(result["answer"]), result.get("sources", []))
+        self._insert_message(session_id, "assistant", answer, sources)
         self._touch_chat_session(session_id)
         self._touch_notebook(user_id, notebook_id)
         messages = self._messages(session_id)
         return {
             "session_id": session_id,
             "messages": messages,
-            "answer": str(result["answer"]),
-            "sources": result.get("sources", []),
+            "answer": answer,
+            "sources": sources,
             "strategy": result.get("strategy"),
             "strategy_reasoning": result.get("strategy_reasoning"),
         }
@@ -411,6 +448,15 @@ class NotebookWorkspaceService:
         if missing:
             raise NotebookValidationError(f"These documents are not ready for chat: {', '.join(missing)}")
         return unique_names
+
+    def _answer_with_fallback_citations(self, answer: str, sources: list[dict[str, Any]]) -> str:
+        if not sources or CITATION_PATTERN.search(answer):
+            return answer
+
+        citation_count = min(len(sources), 3)
+        citations = " ".join(f"[{index}]" for index in range(1, citation_count + 1))
+        logger.info("RAG answer had no [N] citations; appended fallback citations=%s", citations)
+        return f"{answer.rstrip()}\n\nNguồn: {citations}"
 
     def _touch_notebook(self, user_id: str, notebook_id: str) -> None:
         (
