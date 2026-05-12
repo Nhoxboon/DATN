@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { NotebookDetail, NotebookSummary, SourceItem, UserProfile } from '../types'
 import { documentService } from '../services/documentService'
-import { buildUserProfile } from '../services/authService'
 import { useAuth } from './useAuth'
 
 export function useDocuments(notebookId?: string) {
@@ -11,10 +10,49 @@ export function useDocuments(notebookId?: string) {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [notebook, setNotebook] = useState<NotebookDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const hasLoadedRef = useRef(false)
+  const loadScopeRef = useRef('')
+  const userId = user?.id ?? null
+  const userEmail = user?.email ?? null
+  const userFullName =
+    typeof user?.user_metadata.full_name === 'string' ? user.user_metadata.full_name : null
+  const userName =
+    typeof user?.user_metadata.name === 'string' ? user.user_metadata.name : null
+  const userProfile = useMemo<UserProfile | null>(() => {
+    if (!userId) {
+      return null
+    }
+
+    const fullName = userFullName || userName || userEmail?.split('@')[0] || 'Scholar'
+    const avatarLabel = fullName
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase())
+      .join('')
+      .padEnd(2, 'S')
+      .slice(0, 2)
+
+    return {
+      id: userId,
+      name: fullName,
+      role: userEmail || 'Research workspace',
+      avatarLabel,
+    }
+  }, [userEmail, userFullName, userId, userName])
 
   const load = useCallback(async (options?: { silent?: boolean }) => {
-    if (!options?.silent) {
+    const loadScope = `${userId ?? 'anonymous'}:${notebookId ?? 'dashboard'}`
+    if (loadScopeRef.current !== loadScope) {
+      loadScopeRef.current = loadScope
+      hasLoadedRef.current = false
+    }
+
+    const isBlockingLoad = !options?.silent && !hasLoadedRef.current
+
+    if (isBlockingLoad) {
       setLoading(true)
+      setNotebook(null)
     }
     setError(null)
 
@@ -24,20 +62,23 @@ export function useDocuments(notebookId?: string) {
         notebookId ? documentService.getNotebookDetail(notebookId) : Promise.resolve(null),
       ])
 
-      setProfile(buildUserProfile(user))
+      setProfile(userProfile)
       setSummaries(summaryData)
       setNotebook(notebookData)
     } catch (err) {
       setError((err as Error).message)
-      if (!options?.silent) {
+      if (isBlockingLoad) {
         setNotebook(null)
       }
     } finally {
       if (!options?.silent) {
+        hasLoadedRef.current = true
+      }
+      if (!options?.silent) {
         setLoading(false)
       }
     }
-  }, [notebookId, user])
+  }, [notebookId, userId, userProfile])
 
   const refreshNotebook = useCallback(async () => {
     if (!notebookId) {
@@ -79,7 +120,9 @@ export function useDocuments(notebookId?: string) {
     }
 
     const intervalId = window.setInterval(() => {
-      void refreshNotebook()
+      if (document.visibilityState === 'visible') {
+        void refreshNotebook()
+      }
     }, 5000)
 
     return () => {

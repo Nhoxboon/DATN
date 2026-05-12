@@ -1,4 +1,4 @@
-import { Bookmark, Copy, Sparkles, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import type { NotebookDetail } from '../../types'
 import { useTypewriter } from '../../hooks/useTypewriter'
 
@@ -24,27 +24,6 @@ export function SynthesisCard({ notebook }: { notebook: NotebookDetail }) {
             </li>
           ))}
         </ul>
-      </div>
-
-      <div className="mt-7 flex items-center justify-between gap-4">
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 rounded-xl border border-outline/50 px-3.5 py-2 text-[0.78rem] text-ink transition hover:bg-surface-low"
-        >
-          <Bookmark className="h-3.5 w-3.5" />
-          Save to note
-        </button>
-        <div className="flex items-center gap-4 text-ink">
-          <button type="button" className="transition hover:text-primary">
-            <ThumbsUp className="h-4 w-4" />
-          </button>
-          <button type="button" className="transition hover:text-primary">
-            <ThumbsDown className="h-4 w-4" />
-          </button>
-          <button type="button" className="transition hover:text-primary">
-            <Copy className="h-4 w-4" />
-          </button>
-        </div>
       </div>
     </section>
   )

@@ -96,7 +96,7 @@ function toDetail(detail: BackendNotebookDetail): NotebookDetail {
       ? [
           'Checked sources define the retrieval scope for each answer.',
           'Chat history is saved until you start a new chat.',
-          'Use "Lưu vào sổ ghi chú" to preserve important answers in Studio.',
+          'Use "Save to note" to preserve important answers in Studio.',
         ]
       : [
           'Upload one or more PDF files.',

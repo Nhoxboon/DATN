@@ -13,6 +13,7 @@ export function DashboardPage() {
   const { loading, summaries, profile, createNotebook, deleteNotebook, renameNotebook, error } = useDocuments()
   const avatarRef = useRef<HTMLButtonElement | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [creatingNotebook, setCreatingNotebook] = useState(false)
 
   const handleSignOut = async () => {
     await signOut()
@@ -20,8 +21,17 @@ export function DashboardPage() {
   }
 
   const handleCreateNotebook = async () => {
-    const created = await createNotebook()
-    navigate(`/notebooks/${created.id}`)
+    if (creatingNotebook) {
+      return
+    }
+
+    setCreatingNotebook(true)
+    try {
+      const created = await createNotebook()
+      navigate(`/notebooks/${created.id}`)
+    } catch {
+      setCreatingNotebook(false)
+    }
   }
 
   const handleDeleteNotebook = async (id: string) => {
@@ -82,12 +92,13 @@ export function DashboardPage() {
 
           <Button
             className="h-10 rounded-lg px-4 py-0 text-xs font-semibold shadow-none"
+            disabled={creatingNotebook}
             onClick={() => {
               void handleCreateNotebook()
             }}
           >
             <PlusCircle className="h-3.5 w-3.5" />
-            Create New Notebook
+            {creatingNotebook ? 'Creating...' : 'Create New Notebook'}
           </Button>
         </div>
 
@@ -118,16 +129,17 @@ export function DashboardPage() {
 
         <button
           type="button"
+          disabled={creatingNotebook}
           onClick={() => {
             void handleCreateNotebook()
           }}
-          className="flex min-h-38 flex-col items-center justify-center rounded-[10px] border border-dashed border-outline/80 bg-transparent px-8 py-6 text-center transition hover:bg-white/45"
+          className="flex min-h-38 flex-col items-center justify-center rounded-[10px] border border-dashed border-outline/80 bg-transparent px-8 py-6 text-center transition hover:bg-white/45 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-[10px] bg-surface-high text-primary">
             <FilePlus2 className="h-4 w-4" />
           </div>
           <div className="space-y-1.5">
-            <h3 className="text-sm font-medium text-ink">New Research Project</h3>
+            <h3 className="text-sm font-medium text-ink">{creatingNotebook ? 'Creating...' : 'New Research Project'}</h3>
             <p className="mx-auto max-w-52.5 text-[0.72rem] leading-5 text-muted">
               Create a blank workspace to start collecting sources.
             </p>

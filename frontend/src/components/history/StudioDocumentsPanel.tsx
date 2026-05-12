@@ -37,7 +37,7 @@ export function StudioDocumentsPanel({ documents, onOpenDocument }: StudioDocume
       <div className="space-y-3">
         {!documents.length && (
           <div className="rounded-[10px] border border-dashed border-outline/70 px-4 py-5 text-[0.72rem] leading-5 text-muted">
-            Chưa có ghi chú nào được lưu.
+            No saved notes yet.
           </div>
         )}
         {documents.map((document) => {

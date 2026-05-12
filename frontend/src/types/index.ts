@@ -48,6 +48,12 @@ export interface ChatMessage {
   timestamp: string
   sources?: RagSource[]
   saved?: boolean
+  pending?: boolean
+  error?: boolean
+  progressLabel?: string
+  answerMode?: 'singlehop' | 'multihop'
+  strategy?: string | null
+  strategyReasoning?: string | null
 }
 
 export interface UploadCandidate {

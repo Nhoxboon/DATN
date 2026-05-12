@@ -2,9 +2,26 @@ import { useCallback, useEffect, useState } from 'react'
 import type { ChatMessage, RagSource, StudioDocument } from '../types'
 import { chatService } from '../services/chatService'
 
+const pendingStages = [
+  'Sending question',
+  'Checking selected sources',
+  'Retrieving relevant chunks',
+  'Running RAG reasoning',
+  'Waiting for model response',
+  'Formatting citations',
+  'Still working',
+]
+
 interface SaveNotePayload {
   assistantMessageId: string
   documentNames: string[]
+}
+
+function localTimestamp() {
+  return new Date().toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function findQuestion(messages: ChatMessage[], assistantMessageId: string) {
@@ -62,12 +79,59 @@ export function useChatManager(notebookId?: string) {
       setIsPending(true)
       setError(null)
 
+      const now = Date.now()
+      const localUserId = `local-user-${now}`
+      const localAssistantId = `local-assistant-${now}`
+      const localUserMessage: ChatMessage = {
+        id: localUserId,
+        role: 'user',
+        content: input.trim(),
+        timestamp: localTimestamp(),
+      }
+      const localAssistantMessage: ChatMessage = {
+        id: localAssistantId,
+        role: 'assistant',
+        content: '',
+        timestamp: localTimestamp(),
+        pending: true,
+        progressLabel: pendingStages[0],
+      }
+
+      setMessages((current) => [...current, localUserMessage, localAssistantMessage])
+
+      let stageIndex = 0
+      const stageTimer = window.setInterval(() => {
+        stageIndex = Math.min(stageIndex + 1, pendingStages.length - 1)
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === localAssistantId
+              ? { ...message, progressLabel: pendingStages[stageIndex] }
+              : message,
+          ),
+        )
+      }, 1400)
+
       try {
         const nextMessages = await chatService.sendMessage(notebookId, input, documentNames)
         setMessages(nextMessages)
       } catch (err) {
-        setError((err as Error).message)
+        const errorMessage = (err as Error).message
+        setError(errorMessage)
+        setMessages((current) =>
+          current.map((message) =>
+            message.id === localAssistantId
+              ? {
+                  ...message,
+                  content: `Could not generate an answer: ${errorMessage}`,
+                  pending: false,
+                  error: true,
+                  progressLabel: undefined,
+                }
+              : message,
+          ),
+        )
       } finally {
+        window.clearInterval(stageTimer)
         setIsPending(false)
       }
     },

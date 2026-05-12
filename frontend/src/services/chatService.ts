@@ -21,6 +21,14 @@ function timeLabel(value: string) {
   })
 }
 
+function answerModeFromStrategy(strategy?: string | null): ChatMessage['answerMode'] {
+  if (!strategy) {
+    return undefined
+  }
+
+  return strategy.toLowerCase().includes('multi') ? 'multihop' : 'singlehop'
+}
+
 function toMessage(message: BackendChatMessage): ChatMessage | null {
   if (message.role === 'system') {
     return null
@@ -37,6 +45,24 @@ function toMessage(message: BackendChatMessage): ChatMessage | null {
 
 function toMessages(messages: BackendChatMessage[]) {
   return messages.map(toMessage).filter((message): message is ChatMessage => Boolean(message))
+}
+
+function withResponseStrategy(messages: ChatMessage[], data: BackendChatSendResponse) {
+  const assistantIndex = messages.findLastIndex((message) => message.role === 'assistant')
+  if (assistantIndex === -1 || !data.strategy) {
+    return messages
+  }
+
+  return messages.map((message, index) =>
+    index === assistantIndex
+      ? {
+          ...message,
+          strategy: data.strategy,
+          strategyReasoning: data.strategy_reasoning,
+          answerMode: answerModeFromStrategy(data.strategy),
+        }
+      : message,
+  )
 }
 
 function toStudioDocument(note: BackendNotebookNote): StudioDocument {
@@ -79,7 +105,7 @@ export const chatService = {
       },
     )
 
-    return toMessages(data.messages)
+    return withResponseStrategy(toMessages(data.messages), data)
   },
 
   async newChat(notebookId: string): Promise<ChatMessage[]> {

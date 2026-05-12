@@ -1,4 +1,4 @@
-import { Bookmark, BookmarkCheck } from 'lucide-react'
+import { Bot, Bookmark, BookmarkCheck, Check, Copy, UserRound } from 'lucide-react'
 import { createPortal } from 'react-dom'
 import { useRef, useState } from 'react'
 import type { ReactNode } from 'react'
@@ -103,6 +103,19 @@ function CitationMarker({ number, source }: { number: number; source: RagSource 
 }
 
 function renderMessageContent(message: ChatMessage) {
+  if (message.pending) {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="inline-flex items-center gap-1">
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.2s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary [animation-delay:-0.1s]" />
+          <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-primary" />
+        </span>
+        <span className="text-xs font-semibold text-muted">{message.progressLabel || 'Responding'}</span>
+      </div>
+    )
+  }
+
   const parts: ReactNode[] = []
   let lastIndex = 0
   let match: RegExpExecArray | null
@@ -145,51 +158,97 @@ function renderMessageContent(message: ChatMessage) {
 
 export function ChatMessageList({ messages, intro, onSaveNote, savingNoteId }: ChatMessageListProps) {
   const scrollRef = useScrollToBottom(messages)
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
+
+  const copyAnswer = async (message: ChatMessage) => {
+    await navigator.clipboard.writeText(message.content)
+    setCopiedMessageId(message.id)
+    window.setTimeout(() => {
+      setCopiedMessageId((current) => (current === message.id ? null : current))
+    }, 1400)
+  }
 
   return (
-    <div ref={scrollRef} className="max-h-[320px] space-y-4 overflow-y-auto pr-1">
+    <div ref={scrollRef} className="h-full min-h-0 space-y-4 overflow-y-auto pr-1">
       {intro}
       {messages.map((message) => {
         const isAssistant = message.role === 'assistant'
+        const canUseAssistantActions = isAssistant && !message.pending && !message.error
 
         return (
-          <article
+          <div
             key={message.id}
-            className={`max-w-[92%] rounded-[24px] px-4 py-3.5 text-sm leading-7 shadow-paper ${
-              isAssistant
-                ? 'bg-surface-low text-ink'
-                : 'ml-auto bg-gradient-to-br from-primary to-primary-deep text-white'
-            }`}
+            className={`flex items-start gap-3 ${isAssistant ? 'justify-start' : 'justify-end'}`}
           >
-            <div>{renderMessageContent(message)}</div>
-            {isAssistant && Boolean(message.sources?.length) && (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {message.sources?.slice(0, 4).map((source, index) => (
-                  <span
-                    key={`${message.id}-${source.document}-${index}`}
-                    className="rounded-md bg-white px-2 py-1 text-[0.66rem] leading-none text-muted shadow-[inset_0_0_0_1px_rgba(171,179,183,0.16)]"
-                  >
-                    {source.document}
-                    {source.page_range ? ` - ${source.page_range}` : ''}
-                  </span>
-                ))}
+            {isAssistant && (
+              <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-primary shadow-[inset_0_0_0_1px_rgba(171,179,183,0.28)]">
+                <Bot className="h-4 w-4" />
               </div>
             )}
-            <div className={`mt-2 text-[0.72rem] uppercase tracking-[0.18em] ${isAssistant ? 'text-muted' : 'text-white/70'}`}>
-              {message.timestamp}
-            </div>
-            {isAssistant && onSaveNote && (
-              <button
-                type="button"
-                onClick={() => onSaveNote(message.id)}
-                disabled={message.saved || savingNoteId === message.id}
-                className="mt-3 inline-flex items-center gap-2 rounded-xl border border-outline/50 bg-white px-3.5 py-2 text-[0.7rem] font-semibold text-primary transition hover:bg-white/80 disabled:cursor-default disabled:text-primary/55"
-              >
-                {message.saved ? <BookmarkCheck className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />}
-                {message.saved ? 'Saved to note' : savingNoteId === message.id ? 'Saving...' : 'Save to note'}
-              </button>
+            <article
+              className={`max-w-[92%] rounded-[24px] px-4 py-3.5 text-sm leading-7 shadow-paper ${
+                isAssistant
+                  ? message.error
+                    ? 'bg-red-50 text-red-900'
+                    : 'bg-surface-low text-ink'
+                  : 'bg-gradient-to-br from-primary to-primary-deep text-white'
+              }`}
+            >
+              {isAssistant && message.answerMode && !message.pending && (
+                <div className="mb-2 text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-primary">
+                  [{message.answerMode}]
+                </div>
+              )}
+              <div>{renderMessageContent(message)}</div>
+              {isAssistant && !message.pending && Boolean(message.sources?.length) && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {message.sources?.slice(0, 4).map((source, index) => (
+                    <span
+                      key={`${message.id}-${source.document}-${index}`}
+                      className="rounded-md bg-white px-2 py-1 text-[0.66rem] leading-none text-muted shadow-[inset_0_0_0_1px_rgba(171,179,183,0.16)]"
+                    >
+                      {source.document}
+                      {source.page_range ? ` - ${source.page_range}` : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className={`mt-2 text-[0.72rem] uppercase tracking-[0.18em] ${isAssistant ? 'text-muted' : 'text-white/70'}`}>
+                {message.timestamp}
+              </div>
+              {canUseAssistantActions && (
+                <div className="mt-3 flex items-center gap-2">
+                  {onSaveNote && (
+                    <button
+                      type="button"
+                      onClick={() => onSaveNote(message.id)}
+                      disabled={message.saved || savingNoteId === message.id}
+                      className="inline-flex items-center gap-2 rounded-xl border border-outline/50 bg-white px-3.5 py-2 text-[0.7rem] font-semibold text-primary transition hover:bg-white/80 disabled:cursor-default disabled:text-primary/55"
+                    >
+                      {message.saved ? <BookmarkCheck className="h-3.5 w-3.5" /> : <Bookmark className="h-3.5 w-3.5" />}
+                      {message.saved ? 'Saved to note' : savingNoteId === message.id ? 'Saving...' : 'Save to note'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void copyAnswer(message)
+                    }}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-outline/50 bg-white text-primary transition hover:bg-white/80"
+                    aria-label="Copy answer"
+                    title="Copy answer"
+                  >
+                    {copiedMessageId === message.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                  </button>
+                </div>
+              )}
+            </article>
+            {!isAssistant && (
+              <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <UserRound className="h-4 w-4" />
+              </div>
             )}
-          </article>
+          </div>
         )
       })}
     </div>

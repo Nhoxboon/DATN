@@ -1,4 +1,4 @@
-import { Paperclip, Send } from 'lucide-react'
+import { Send } from 'lucide-react'
 import { useState } from 'react'
 
 interface ChatComposerProps {
@@ -26,11 +26,8 @@ export function ChatComposer({
   }
 
   return (
-    <div className="border-t border-black/10 bg-white px-5 py-5">
+    <div className="shrink-0 border-t border-black/10 bg-white px-5 py-5">
       <div className="flex items-center gap-3 rounded-[18px] bg-surface-low px-4 py-3.5">
-        <button type="button" className="text-muted transition hover:text-ink">
-          <Paperclip className="h-4 w-4" />
-        </button>
         <label className="flex-1">
           <span className="sr-only">Ask Scholar Script</span>
           <input

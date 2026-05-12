@@ -208,7 +208,7 @@ export function NotebookEditorPage() {
               disabled={isPending}
               className="rounded-lg border border-outline/60 px-3 py-2 text-[0.72rem] font-semibold text-ink transition hover:bg-white disabled:opacity-60"
             >
-              Tạo đoạn chat mới
+              New chat
             </button>
             <button
               ref={avatarRef}
@@ -223,14 +223,14 @@ export function NotebookEditorPage() {
         </div>
       </div>
 
-      {loading || !notebook ? (
-        <div className="grid min-h-[calc(100vh-49px)] gap-0 lg:grid-cols-[21.875%_53.125%_25%]">
+      {loading && !notebook ? (
+        <div className="grid h-[calc(100vh-49px)] min-h-0 gap-0 lg:grid-cols-[21.875%_53.125%_25%]">
           <div className="animate-pulse bg-surface-low" />
           <div className="animate-pulse border-x border-black/10 bg-white" />
           <div className="animate-pulse bg-surface-low" />
         </div>
-      ) : (
-        <div className="grid min-h-[calc(100vh-49px)] gap-0 lg:grid-cols-[21.875%_53.125%_25%]">
+      ) : notebook ? (
+        <div className="grid h-[calc(100vh-49px)] min-h-0 gap-0 lg:grid-cols-[21.875%_53.125%_25%]">
           <div className="bg-surface-low px-5 py-4 xl:px-6">
             <SourceRail
               sources={sourcesWithSelection}
@@ -240,9 +240,8 @@ export function NotebookEditorPage() {
             />
           </div>
 
-          <section className="flex min-h-0 flex-col border-x border-black/10 bg-white">
-            <div className="flex-1 overflow-y-auto">
-              <div className="px-6 pb-4 sm:px-7">
+          <section className="flex h-full min-h-0 flex-col border-x border-black/10 bg-white">
+            <div className="min-h-0 flex-1 overflow-hidden px-6 pb-4 sm:px-7">
                 {isPending && (
                   <div className="mb-3 text-[0.58rem] uppercase tracking-[0.14em] text-muted">
                     Responding...
@@ -259,7 +258,6 @@ export function NotebookEditorPage() {
                   onSaveNote={handleSaveNote}
                   savingNoteId={savingNoteId}
                 />
-              </div>
             </div>
             <ChatComposer
               disabled={isPending || !selectedSourceNames.length}
@@ -275,6 +273,10 @@ export function NotebookEditorPage() {
           <div className="bg-surface-low px-5 py-4 xl:px-6">
             <StudioDocumentsPanel documents={notebook.studioDocuments} onOpenDocument={setActiveNote} />
           </div>
+        </div>
+      ) : (
+        <div className="flex h-[calc(100vh-49px)] items-center justify-center bg-white px-6 text-sm text-muted">
+          {documentError || 'Could not load this notebook.'}
         </div>
       )}
 
