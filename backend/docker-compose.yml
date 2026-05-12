@@ -53,6 +53,18 @@ services:
       context: .
       dockerfile: Dockerfile.worker
     container_name: datn-worker
+    command:
+      - uv
+      - run
+      - celery
+      - -A
+      - app.workers.celery_app
+      - worker
+      - --loglevel=info
+      - --pool=solo
+      - --concurrency=1
+      - -Q
+      - document_processing,embedding,storage
     env_file:
       - .env
     environment:

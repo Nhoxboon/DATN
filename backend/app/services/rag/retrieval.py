@@ -4,7 +4,6 @@ from contextvars import ContextVar, Token
 from typing import List, Dict, Any, Optional
 from supabase import Client
 from app.services.embedding import EmbeddingService
-from app.services.reranker import RerankerService
 from app.db.repository import get_document_repository
 from app.core.config import get_app_config
 
@@ -35,17 +34,28 @@ class RetrievalService:
         self.doc_repo = get_document_repository(supabase_client)
         self._notebook_id: ContextVar[str | None] = ContextVar("rag_notebook_id", default=None)
 
-        # Initialize reranker if enabled
+        # Load the reranker lazily. The cross-encoder pulls in torch and can take
+        # several seconds to initialize, even for requests that never rerank.
         self.reranker = None
-        if use_reranking:
+        self.reranker_model = get_app_config().rag.reranking.model
+
+    def _get_reranker(self):
+        """Initialize the cross-encoder only when a query actually needs reranking."""
+        if not self.use_reranking:
+            return None
+
+        if self.reranker is None:
             try:
-                app_config = get_app_config()
-                reranker_model = app_config.rag.reranking.model
-                # Use CPU for reranking to avoid MPS memory issues on Mac
-                self.reranker = RerankerService(model_name=reranker_model, force_cpu=True)
+                from app.services.reranker import RerankerService
+
+                # Use CPU for reranking to avoid GPU contention with PDF workers.
+                self.reranker = RerankerService(model_name=self.reranker_model, force_cpu=True)
             except Exception as e:
                 print(f"Warning: Could not initialize reranker: {e}")
                 self.use_reranking = False
+                return None
+
+        return self.reranker
 
     def set_notebook_scope(self, notebook_id: str) -> Token[str | None]:
         """Set the notebook scope for the current request context."""
@@ -95,7 +105,6 @@ class RetrievalService:
             # Only rerank when searching multiple documents
             should_rerank = (
                 self.use_reranking and
-                self.reranker and
                 doc_names is not None and
                 len(doc_names) > 1
             )
@@ -112,8 +121,9 @@ class RetrievalService:
             )
 
             # Rerank only for multi-document queries
-            if should_rerank and results:
-                results = self.reranker.rerank(query, results, top_k=self.top_k)
+            reranker = self._get_reranker() if should_rerank else None
+            if reranker and results:
+                results = reranker.rerank(query, results, top_k=self.top_k)
             else:
                 results = results[:self.top_k]
 
@@ -217,9 +227,10 @@ class RetrievalService:
             return []
 
         # Stage 3: Rerank combined results if enabled
-        if self.use_reranking and self.reranker:
+        reranker = self._get_reranker()
+        if reranker:
             print(f"[DEBUG] Stage 3: Reranking {len(deep_results)} results to top {self.top_k}")
-            final_results = self.reranker.rerank(query, deep_results, top_k=self.top_k)
+            final_results = reranker.rerank(query, deep_results, top_k=self.top_k)
         else:
             # Fallback: sort by embedding similarity
             final_results = sorted(

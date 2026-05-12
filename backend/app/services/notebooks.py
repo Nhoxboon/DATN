@@ -20,7 +20,6 @@ from app.schemas.notebooks import (
     NotebookNote,
     NotebookSummary,
 )
-from app.services.documents import get_document_service
 
 
 logger = logging.getLogger(__name__)
@@ -189,6 +188,8 @@ class NotebookWorkspaceService:
                 task_id="sync-upload",
             )
             status_repo.update_status(notebook_id, document_name, ProcessingStatus.PROCESSING)
+            from app.services.documents.dependencies import get_document_service
+
             service = get_document_service()
             logger.info(
                 "Starting sync notebook document upload notebook_id=%s user_id=%s document=%s bytes=%s",
@@ -238,6 +239,8 @@ class NotebookWorkspaceService:
 
     def delete_document(self, user_id: str, notebook_id: str, document_name: str) -> None:
         self._require_notebook(user_id, notebook_id)
+        from app.services.documents.dependencies import get_document_service
+
         service = get_document_service()
         service.delete_document(notebook_id, user_id, document_name)
         get_processing_status_repository(self.client).delete_status(notebook_id, document_name)
