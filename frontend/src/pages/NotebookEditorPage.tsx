@@ -11,7 +11,7 @@ import { StudioDocumentsPanel } from '../components/history/StudioDocumentsPanel
 import { useChatManager } from '../hooks/useChatManager'
 import { useDocuments } from '../hooks/useDocuments'
 import { useAuth } from '../hooks/useAuth'
-import type { StudioDocument } from '../types'
+import type { SourceItem, StudioDocument } from '../types'
 
 export function NotebookEditorPage() {
   const { notebookId = '' } = useParams()
@@ -28,7 +28,19 @@ export function NotebookEditorPage() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [renaming, setRenaming] = useState(false)
-  const { loading, notebook, processUploads, profile, addStudioDocument, renameNotebook, error: documentError } = useDocuments(notebookId)
+  const {
+    loading,
+    notebook,
+    processUploads,
+    profile,
+    addStudioDocument,
+    renameNotebook,
+    renameSource,
+    deleteSource,
+    renameNote,
+    deleteNote,
+    error: documentError,
+  } = useDocuments(notebookId)
   const { messages, isPending, error: chatError, sendMessage, newChat, saveNote } = useChatManager(notebookId)
 
   const completedSourceNames =
@@ -127,6 +139,91 @@ export function NotebookEditorPage() {
       ...current,
       [notebook.id]: allCompletedSelected ? completedSourceNames : [],
     }))
+  }
+
+  const handleRenameSource = async (source: SourceItem) => {
+    if (!notebook) {
+      return
+    }
+
+    const nextName = window.prompt('Rename source', source.name)
+    const cleanName = nextName?.trim()
+
+    if (!cleanName || cleanName === source.name) {
+      return
+    }
+
+    setNoteError(null)
+    try {
+      await renameSource(source.name, cleanName)
+      setDeselectedByNotebook((current) => {
+        const deselected = current[notebook.id] ?? []
+        if (!deselected.includes(source.name)) {
+          return current
+        }
+
+        return {
+          ...current,
+          [notebook.id]: deselected.map((name) => (name === source.name ? cleanName.replace(/\.pdf$/i, '') : name)),
+        }
+      })
+    } catch (err) {
+      setNoteError((err as Error).message)
+    }
+  }
+
+  const handleDeleteSource = async (source: SourceItem) => {
+    if (!notebook) {
+      return
+    }
+
+    if (!window.confirm(`Delete source "${source.name}"?`)) {
+      return
+    }
+
+    setNoteError(null)
+    try {
+      await deleteSource(source.name)
+      setDeselectedByNotebook((current) => ({
+        ...current,
+        [notebook.id]: (current[notebook.id] ?? []).filter((name) => name !== source.name),
+      }))
+    } catch (err) {
+      setNoteError((err as Error).message)
+    }
+  }
+
+  const handleRenameNote = async (document: StudioDocument) => {
+    const nextTitle = window.prompt('Rename note', document.title)
+    const cleanTitle = nextTitle?.trim()
+
+    if (!cleanTitle || cleanTitle === document.title) {
+      return
+    }
+
+    setNoteError(null)
+    try {
+      const renamed = await renameNote(document.id, cleanTitle)
+      if (renamed) {
+        setActiveNote((current) => (current?.id === document.id ? renamed : current))
+      }
+    } catch (err) {
+      setNoteError((err as Error).message)
+    }
+  }
+
+  const handleDeleteNote = async (document: StudioDocument) => {
+    if (!window.confirm(`Delete note "${document.title}"?`)) {
+      return
+    }
+
+    setNoteError(null)
+    try {
+      await deleteNote(document.id)
+      setActiveNote((current) => (current?.id === document.id ? null : current))
+    } catch (err) {
+      setNoteError((err as Error).message)
+    }
   }
 
   const handleSendMessage = (input: string) => {
@@ -237,6 +334,12 @@ export function NotebookEditorPage() {
               onAddSource={openModal}
               onToggleSource={handleToggleSource}
               onToggleAllSources={handleToggleAllSources}
+              onRenameSource={(source) => {
+                void handleRenameSource(source)
+              }}
+              onDeleteSource={(source) => {
+                void handleDeleteSource(source)
+              }}
             />
           </div>
 
@@ -271,7 +374,16 @@ export function NotebookEditorPage() {
           </section>
 
           <div className="bg-surface-low px-5 py-4 xl:px-6">
-            <StudioDocumentsPanel documents={notebook.studioDocuments} onOpenDocument={setActiveNote} />
+            <StudioDocumentsPanel
+              documents={notebook.studioDocuments}
+              onOpenDocument={setActiveNote}
+              onRenameNote={(document) => {
+                void handleRenameNote(document)
+              }}
+              onDeleteNote={(document) => {
+                void handleDeleteNote(document)
+              }}
+            />
           </div>
         </div>
       ) : (

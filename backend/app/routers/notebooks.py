@@ -11,9 +11,11 @@ from app.schemas.notebooks import (
     ChatCurrentResponse,
     ChatSendRequest,
     ChatSendResponse,
+    DocumentRenameRequest,
     DocumentStatus,
     DocumentUploadResponse,
     NoteCreateRequest,
+    NoteUpdateRequest,
     NotebookCreateRequest,
     NotebookDetail,
     NotebookNote,
@@ -136,7 +138,7 @@ async def upload_document(
     current_user: CurrentUser = Depends(get_current_user),
     service: NotebookWorkspaceService = Depends(get_workspace_service),
 ) -> DocumentUploadResponse:
-    """Upload and synchronously index a PDF into a notebook."""
+    """Upload and queue a PDF for worker indexing into a notebook."""
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Filename is required.")
 
@@ -174,6 +176,45 @@ async def upload_document(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 
+@router.post("/{notebook_id}/documents/rename", response_model=NotebookDetail)
+async def rename_document_by_name(
+    notebook_id: str,
+    payload: DocumentRenameRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    service: NotebookWorkspaceService = Depends(get_workspace_service),
+) -> NotebookDetail:
+    """Rename a notebook source document by request body."""
+    if not payload.current_document_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current source name is required.")
+
+    try:
+        return service.rename_document(
+            current_user.id,
+            notebook_id,
+            payload.current_document_name,
+            payload.document_name,
+        )
+    except Exception as exc:
+        _handle_notebook_error(exc)
+        raise
+
+
+@router.patch("/{notebook_id}/documents/{document_name}", response_model=NotebookDetail)
+async def rename_document(
+    notebook_id: str,
+    document_name: str,
+    payload: DocumentRenameRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    service: NotebookWorkspaceService = Depends(get_workspace_service),
+) -> NotebookDetail:
+    """Rename a notebook source document."""
+    try:
+        return service.rename_document(current_user.id, notebook_id, document_name, payload.document_name)
+    except Exception as exc:
+        _handle_notebook_error(exc)
+        raise
+
+
 @router.delete("/{notebook_id}/documents/{document_name}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document(
     notebook_id: str,
@@ -201,6 +242,36 @@ async def get_current_chat(
     except Exception as exc:
         _handle_notebook_error(exc)
         raise
+
+
+@router.patch("/{notebook_id}/notes/{note_id}", response_model=NotebookNote)
+async def update_note(
+    notebook_id: str,
+    note_id: str,
+    payload: NoteUpdateRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    service: NotebookWorkspaceService = Depends(get_workspace_service),
+) -> NotebookNote:
+    """Rename a saved Studio note."""
+    try:
+        return service.update_note(current_user.id, notebook_id, note_id, payload.question)
+    except Exception as exc:
+        _handle_notebook_error(exc)
+        raise
+
+
+@router.delete("/{notebook_id}/notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_note(
+    notebook_id: str,
+    note_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    service: NotebookWorkspaceService = Depends(get_workspace_service),
+) -> None:
+    """Delete a saved Studio note."""
+    try:
+        service.delete_note(current_user.id, notebook_id, note_id)
+    except Exception as exc:
+        _handle_notebook_error(exc)
 
 
 @router.post("/{notebook_id}/chat/messages", response_model=ChatSendResponse)

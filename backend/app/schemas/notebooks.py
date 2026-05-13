@@ -19,6 +19,13 @@ class NotebookUpdateRequest(BaseModel):
     description: str | None = None
 
 
+class DocumentRenameRequest(BaseModel):
+    """Rename a notebook source document."""
+
+    current_document_name: str | None = Field(default=None, min_length=1, max_length=220)
+    document_name: str = Field(..., min_length=1, max_length=220)
+
+
 class NotebookSummary(BaseModel):
     """Notebook shown on the dashboard."""
 
@@ -114,3 +121,9 @@ class NoteCreateRequest(BaseModel):
     answer: str = Field(..., min_length=1)
     sources: list[dict[str, Any]] = Field(default_factory=list)
     document_names: list[str] = Field(default_factory=list)
+
+
+class NoteUpdateRequest(BaseModel):
+    """Update a saved Studio note."""
+
+    question: str = Field(..., min_length=1, max_length=300)

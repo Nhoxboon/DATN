@@ -10,6 +10,7 @@ from app.routers import auth, notebooks
 
 
 logger = logging.getLogger(__name__)
+runtime_logger = logging.getLogger("uvicorn.error")
 
 
 def _worker_mode_active(document_processing_mode: str) -> bool:
@@ -50,20 +51,34 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     async def log_runtime_settings() -> None:
-        logger.info(
+        message = (
             "DATN runtime settings: document_processing_mode=%s worker_mode_active=%s "
-            "require_worker_mode=%s redis_url=%s uploads_dir=%s",
+            "require_worker_mode=%s redis_url=%s uploads_dir=%s"
+        )
+        args = (
             settings.document_processing_mode,
             _worker_mode_active(settings.document_processing_mode),
             settings.datn_require_worker_mode,
             settings.redis_url,
             settings.uploads_dir,
         )
+        logger.info(message, *args)
+        runtime_logger.info(message, *args)
+        print(
+            "DATN runtime settings: document_processing_mode=%s worker_mode_active=%s "
+            "require_worker_mode=%s redis_url=%s uploads_dir=%s" % args,
+            flush=True,
+        )
 
     @app.get("/health", tags=["health"])
-    async def health() -> dict[str, str]:
+    async def health() -> dict[str, str | bool]:
         """Health check endpoint."""
-        return {"status": "ok"}
+        return {
+            "status": "ok",
+            "document_processing_mode": settings.document_processing_mode,
+            "worker_mode_active": _worker_mode_active(settings.document_processing_mode),
+            "require_worker_mode": settings.datn_require_worker_mode,
+        }
 
     return app
 

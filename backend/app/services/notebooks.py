@@ -9,8 +9,10 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from celery import Celery
+
 from app.core.config import get_settings
-from app.core.document_naming import document_name_from_filename, safe_pdf_storage_path
+from app.core.document_naming import document_name_from_filename, normalize_document_name, safe_pdf_storage_path
 from app.db.processing_status import ProcessingStatus, get_processing_status_repository
 from app.db.repository import get_document_repository
 from app.schemas.notebooks import (
@@ -139,89 +141,53 @@ class NotebookWorkspaceService:
         notebook = self._require_notebook(user_id, notebook_id)
         document_name = document_name_from_filename(filename)
         status_repo = get_processing_status_repository(self.client)
+        status_created = False
 
         try:
             settings = get_settings()
             self._auto_title_from_first_upload(user_id, notebook_id, notebook, document_name)
-            if settings.document_processing_mode.lower() == "worker":
-                task_id = str(uuid4())
-                upload_dir = Path(settings.uploads_dir) / user_id / notebook_id
-                upload_dir.mkdir(parents=True, exist_ok=True)
-                file_path = upload_dir / safe_pdf_storage_path(document_name)
-                file_path.write_bytes(file_content)
-                logger.info(
-                    "Queued notebook document upload notebook_id=%s user_id=%s document=%s task_id=%s path=%s bytes=%s",
-                    notebook_id,
-                    user_id,
-                    document_name,
-                    task_id,
-                    file_path,
-                    len(file_content),
+            if settings.document_processing_mode.strip().lower() != "worker":
+                raise NotebookValidationError(
+                    "Document upload requires worker mode. Set DOCUMENT_PROCESSING_MODE=worker "
+                    "and run the Celery worker."
                 )
 
-                from app.workers.tasks.document import process_document_task
-
-                status_repo.create_status(
-                    notebook_id=notebook_id,
-                    user_id=user_id,
-                    document_name=document_name,
-                    task_id=task_id,
-                )
-                process_document_task.apply_async(
-                    args=[notebook_id, user_id, document_name, str(file_path)],
-                    queue="document_processing",
-                    task_id=task_id,
-                )
-                self._touch_notebook(user_id, notebook_id)
-                return {
-                    "document_name": document_name,
-                    "chunks_processed": 0,
-                    "storage_path": str(file_path),
-                    "public_url": None,
-                    "queued": True,
-                }
+            task_id = str(uuid4())
+            upload_dir = Path(settings.uploads_dir) / user_id / notebook_id
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            file_path = upload_dir / safe_pdf_storage_path(document_name)
+            file_path.write_bytes(file_content)
+            logger.info(
+                "Queued notebook document upload notebook_id=%s user_id=%s document=%s task_id=%s path=%s bytes=%s",
+                notebook_id,
+                user_id,
+                document_name,
+                task_id,
+                file_path,
+                len(file_content),
+            )
 
             status_repo.create_status(
                 notebook_id=notebook_id,
                 user_id=user_id,
                 document_name=document_name,
-                task_id="sync-upload",
+                task_id=task_id,
             )
-            status_repo.update_status(notebook_id, document_name, ProcessingStatus.PROCESSING)
-            from app.services.documents.dependencies import get_document_service
-
-            service = get_document_service()
-            logger.info(
-                "Starting sync notebook document upload notebook_id=%s user_id=%s document=%s bytes=%s",
-                notebook_id,
-                user_id,
-                document_name,
-                len(file_content),
-            )
-            result = service.upload_from_bytes(
-                notebook_id=notebook_id,
-                user_id=user_id,
-                file_content=file_content,
-                filename=filename,
-                document_name=document_name,
-            )
-            chunks_processed = int(result["chunks_processed"])
-            status_repo.update_status(
-                notebook_id,
-                document_name,
-                ProcessingStatus.COMPLETED,
-                processed_chunks=chunks_processed,
-                total_chunks=chunks_processed,
+            status_created = True
+            self._celery_app(settings.redis_url).send_task(
+                "app.workers.tasks.document.process_document_task",
+                args=[notebook_id, user_id, document_name, str(file_path)],
+                queue="document_processing",
+                task_id=task_id,
             )
             self._touch_notebook(user_id, notebook_id)
-            logger.info(
-                "Completed sync notebook document upload notebook_id=%s user_id=%s document=%s chunks=%s",
-                notebook_id,
-                user_id,
-                document_name,
-                chunks_processed,
-            )
-            return result
+            return {
+                "document_name": document_name,
+                "chunks_processed": 0,
+                "storage_path": str(file_path),
+                "public_url": None,
+                "queued": True,
+            }
         except Exception as exc:
             logger.exception(
                 "Notebook document upload failed notebook_id=%s user_id=%s document=%s",
@@ -229,22 +195,79 @@ class NotebookWorkspaceService:
                 user_id,
                 document_name,
             )
-            status_repo.update_status(
-                notebook_id,
-                document_name,
-                ProcessingStatus.FAILED,
-                error_message=str(exc),
-            )
+            if status_created:
+                status_repo.update_status(
+                    notebook_id,
+                    document_name,
+                    ProcessingStatus.FAILED,
+                    error_message=str(exc),
+                )
             raise
 
     def delete_document(self, user_id: str, notebook_id: str, document_name: str) -> None:
-        self._require_notebook(user_id, notebook_id)
-        from app.services.documents.dependencies import get_document_service
+        clean_document_name = self._clean_document_title(document_name)
+        source = self._document_status_row(user_id, notebook_id, clean_document_name)
+        if not source:
+            self._require_notebook(user_id, notebook_id)
+            return
 
-        service = get_document_service()
-        service.delete_document(notebook_id, user_id, document_name)
-        get_processing_status_repository(self.client).delete_status(notebook_id, document_name)
+        storage_paths = self._storage_paths_for_document(user_id, notebook_id, clean_document_name)
+
+        self._revoke_processing_task(source)
+        get_document_repository(self.client).delete_by_name(clean_document_name, notebook_id)
+        get_processing_status_repository(self.client).delete_status(notebook_id, clean_document_name)
+        self._delete_storage_paths(storage_paths)
+        self._delete_local_upload(user_id, notebook_id, clean_document_name)
         self._touch_notebook(user_id, notebook_id)
+
+    def rename_document(
+        self,
+        user_id: str,
+        notebook_id: str,
+        document_name: str,
+        next_document_name: str,
+    ) -> NotebookDetail:
+        current_name = self._clean_document_title(document_name)
+        next_name = self._clean_document_title(next_document_name)
+
+        if current_name == next_name:
+            return self.get_notebook(user_id, notebook_id)
+
+        source = self._require_document_status(user_id, notebook_id, current_name)
+        if source.get("status") in {ProcessingStatus.PENDING, ProcessingStatus.PROCESSING}:
+            raise NotebookValidationError("Wait until indexing finishes before renaming this source.")
+
+        existing = (
+            self.client.table("document_processing_status")
+            .select("id")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .eq("document_name", next_name)
+            .limit(1)
+            .execute()
+        )
+        if _first(existing.data):
+            raise NotebookValidationError(f'A source named "{next_name}" already exists in this notebook.')
+
+        (
+            self.client.table("document_processing_status")
+            .update({"document_name": next_name, "updated_at": _utc_now()})
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .eq("document_name", current_name)
+            .execute()
+        )
+        (
+            self.client.table("documents")
+            .update({"document_name": next_name})
+            .eq("notebook_id", notebook_id)
+            .eq("document_name", current_name)
+            .execute()
+        )
+        self._rename_document_references(user_id, notebook_id, current_name, next_name)
+        self._rename_local_upload(user_id, notebook_id, current_name, next_name)
+        self._touch_notebook(user_id, notebook_id)
+        return self.get_notebook(user_id, notebook_id)
 
     def get_current_chat(self, user_id: str, notebook_id: str) -> tuple[str, list[ChatMessageOut]]:
         session = self._get_or_create_session(user_id, notebook_id)
@@ -341,6 +364,44 @@ class NotebookWorkspaceService:
         self._touch_notebook(user_id, notebook_id)
         return self._note(row)
 
+    def update_note(
+        self,
+        user_id: str,
+        notebook_id: str,
+        note_id: str,
+        question: str,
+    ) -> NotebookNote:
+        self._require_note(user_id, notebook_id, note_id)
+        clean_question = question.strip()
+        if not clean_question:
+            raise NotebookValidationError("Note title is required.")
+
+        result = (
+            self.client.table("notebook_notes")
+            .update({"question": clean_question, "updated_at": _utc_now()})
+            .eq("id", note_id)
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        row = _first(result.data)
+        if not row:
+            raise NotebookValidationError("Note could not be updated.")
+        self._touch_notebook(user_id, notebook_id)
+        return self._note(row)
+
+    def delete_note(self, user_id: str, notebook_id: str, note_id: str) -> None:
+        self._require_note(user_id, notebook_id, note_id)
+        (
+            self.client.table("notebook_notes")
+            .delete()
+            .eq("id", note_id)
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        self._touch_notebook(user_id, notebook_id)
+
     def _source_counts(self, user_id: str) -> dict[str, int]:
         result = (
             self.client.table("document_processing_status")
@@ -368,6 +429,41 @@ class NotebookWorkspaceService:
         row = _first(result.data)
         if not row:
             raise NotebookNotFoundError("Notebook not found.")
+        return row
+
+    def _require_document_status(self, user_id: str, notebook_id: str, document_name: str) -> dict[str, Any]:
+        row = self._document_status_row(user_id, notebook_id, document_name)
+        if not row:
+            raise NotebookNotFoundError("Source not found.")
+        return row
+
+    def _document_status_row(self, user_id: str, notebook_id: str, document_name: str) -> dict[str, Any] | None:
+        self._require_notebook(user_id, notebook_id)
+        result = (
+            self.client.table("document_processing_status")
+            .select("*")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .eq("document_name", document_name)
+            .limit(1)
+            .execute()
+        )
+        return _first(result.data)
+
+    def _require_note(self, user_id: str, notebook_id: str, note_id: str) -> dict[str, Any]:
+        self._require_notebook(user_id, notebook_id)
+        result = (
+            self.client.table("notebook_notes")
+            .select("*")
+            .eq("id", note_id)
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+        row = _first(result.data)
+        if not row:
+            raise NotebookNotFoundError("Note not found.")
         return row
 
     def _get_or_create_session(self, user_id: str, notebook_id: str) -> dict[str, Any]:
@@ -509,6 +605,148 @@ class NotebookWorkspaceService:
 
     def _touch_chat_session(self, session_id: str) -> None:
         self.client.table("chat_sessions").update({"updated_at": _utc_now()}).eq("id", session_id).execute()
+
+    def _clean_document_title(self, value: str) -> str:
+        clean_value = normalize_document_name(value)
+        if clean_value.lower().endswith(".pdf"):
+            clean_value = normalize_document_name(clean_value[:-4])
+        return clean_value
+
+    def _storage_paths_for_document(self, user_id: str, notebook_id: str, document_name: str) -> list[str]:
+        paths = [
+            f"{user_id}/{notebook_id}/{safe_pdf_storage_path(document_name)}",
+            f"{user_id}/{notebook_id}/{document_name}.pdf",
+        ]
+        result = (
+            self.client.table("documents")
+            .select("metadata")
+            .eq("notebook_id", notebook_id)
+            .eq("document_name", document_name)
+            .execute()
+        )
+        rows = result.data if isinstance(result.data, list) else []
+        for row in rows:
+            metadata = row.get("metadata") if isinstance(row, dict) else None
+            if isinstance(metadata, dict) and isinstance(metadata.get("storage_path"), str):
+                paths.append(metadata["storage_path"])
+        return list(dict.fromkeys(paths))
+
+    def _delete_storage_paths(self, storage_paths: list[str]) -> None:
+        storage = getattr(self.client, "storage", None)
+        if not storage or not storage_paths:
+            return
+
+        try:
+            storage.from_("pdfs").remove(storage_paths)
+        except Exception:
+            logger.info("Could not remove one or more source PDFs from storage.", exc_info=True)
+
+    def _revoke_processing_task(self, source: dict[str, Any]) -> None:
+        task_id = str(source.get("task_id") or "").strip()
+        if not task_id:
+            return
+
+        try:
+            settings = get_settings()
+            self._celery_app(settings.redis_url).control.revoke(task_id, terminate=True)
+        except Exception:
+            logger.info("Could not revoke document processing task task_id=%s.", task_id, exc_info=True)
+
+    def _celery_app(self, redis_url: str) -> Celery:
+        return Celery("datn_backend_control", broker=redis_url, backend=redis_url)
+
+    def _rename_document_references(
+        self,
+        user_id: str,
+        notebook_id: str,
+        current_name: str,
+        next_name: str,
+    ) -> None:
+        notes = (
+            self.client.table("notebook_notes")
+            .select("id,document_names,sources")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        for note in (notes.data if isinstance(notes.data, list) else []):
+            updates: dict[str, Any] = {}
+            document_names = note.get("document_names") if isinstance(note, dict) else None
+            if isinstance(document_names, list):
+                renamed_names = [next_name if name == current_name else name for name in document_names]
+                if renamed_names != document_names:
+                    updates["document_names"] = renamed_names
+
+            sources = note.get("sources") if isinstance(note, dict) else None
+            renamed_sources, sources_changed = self._rename_sources(sources, current_name, next_name)
+            if sources_changed:
+                updates["sources"] = renamed_sources
+
+            if updates:
+                updates["updated_at"] = _utc_now()
+                self.client.table("notebook_notes").update(updates).eq("id", note["id"]).execute()
+
+        sessions = (
+            self.client.table("chat_sessions")
+            .select("id")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        for session in (sessions.data if isinstance(sessions.data, list) else []):
+            session_id = session.get("id") if isinstance(session, dict) else None
+            if not session_id:
+                continue
+
+            messages = self.client.table("chat_messages").select("id,sources").eq("session_id", session_id).execute()
+            for message in (messages.data if isinstance(messages.data, list) else []):
+                sources = message.get("sources") if isinstance(message, dict) else None
+                renamed_sources, sources_changed = self._rename_sources(sources, current_name, next_name)
+                if sources_changed:
+                    self.client.table("chat_messages").update({"sources": renamed_sources}).eq("id", message["id"]).execute()
+
+    def _rename_sources(self, sources: Any, current_name: str, next_name: str) -> tuple[list[Any], bool]:
+        if not isinstance(sources, list):
+            return [], False
+
+        changed = False
+        renamed_sources: list[Any] = []
+        for source in sources:
+            if isinstance(source, dict) and source.get("document") == current_name:
+                renamed_source = dict(source)
+                renamed_source["document"] = next_name
+                renamed_sources.append(renamed_source)
+                changed = True
+            else:
+                renamed_sources.append(source)
+
+        return renamed_sources, changed
+
+    def _delete_local_upload(self, user_id: str, notebook_id: str, document_name: str) -> None:
+        try:
+            settings = get_settings()
+            file_path = Path(settings.uploads_dir) / user_id / notebook_id / safe_pdf_storage_path(document_name)
+            if file_path.exists():
+                file_path.unlink()
+        except Exception:
+            logger.info("Could not remove local uploaded PDF.", exc_info=True)
+
+    def _rename_local_upload(
+        self,
+        user_id: str,
+        notebook_id: str,
+        current_name: str,
+        next_name: str,
+    ) -> None:
+        try:
+            settings = get_settings()
+            upload_dir = Path(settings.uploads_dir) / user_id / notebook_id
+            current_path = upload_dir / safe_pdf_storage_path(current_name)
+            next_path = upload_dir / safe_pdf_storage_path(next_name)
+            if current_path.exists() and not next_path.exists():
+                current_path.rename(next_path)
+        except Exception:
+            logger.info("Could not rename local uploaded PDF.", exc_info=True)
 
     def _summary(self, row: dict[str, Any], source_count: int) -> NotebookSummary:
         return NotebookSummary(

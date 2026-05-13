@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from app.db.processing_status import ProcessingStatus
@@ -40,6 +41,14 @@ class FakeQuery:
         self.payload = payload
         return self
 
+    def upsert(self, payload: dict[str, object], on_conflict: str | None = None) -> "FakeQuery":
+        self.operation = "upsert"
+        self.payload = payload
+        if on_conflict:
+            for key in on_conflict.split(","):
+                self.filters.append(("conflict", key.strip(), payload.get(key.strip())))
+        return self
+
     def update(self, payload: dict[str, object]) -> "FakeQuery":
         self.operation = "update"
         self.payload = payload
@@ -71,6 +80,17 @@ class FakeQuery:
             rows = self.payload if isinstance(self.payload, list) else [self.payload]
             inserted = [self.client.insert_row(self.table_name, row or {}) for row in rows]
             return SimpleNamespace(data=inserted)
+
+        if self.operation == "upsert":
+            assert isinstance(self.payload, dict)
+            conflict_filters = [item for item in self.filters if item[0] == "conflict"]
+            rows = list(self.client.tables.get(self.table_name, []))
+            for row in rows:
+                if conflict_filters and all(row.get(key) == value for _, key, value in conflict_filters):
+                    row.update(self.payload)
+                    return SimpleNamespace(data=[row.copy()])
+            inserted = self.client.insert_row(self.table_name, self.payload)
+            return SimpleNamespace(data=[inserted])
 
         rows = self._filtered_rows()
 
@@ -104,6 +124,7 @@ class FakeSupabaseClient:
     def __init__(self):
         self.tables: dict[str, list[dict[str, object]]] = {
             "notebooks": [],
+            "documents": [],
             "document_processing_status": [],
             "chat_sessions": [],
             "chat_messages": [],
@@ -173,6 +194,19 @@ class NotebookWorkspaceTests(unittest.TestCase):
             },
         )
 
+    def add_chunk(self, document_name: str) -> None:
+        self.client.insert_row(
+            "documents",
+            {
+                "notebook_id": "notebook-1",
+                "user_id": "user-1",
+                "document_name": document_name,
+                "chunk_id": 1,
+                "content": "Chunk text",
+                "metadata": {"storage_path": f"user-1/notebook-1/{document_name}.pdf"},
+            },
+        )
+
     def test_ownership_is_enforced(self) -> None:
         with self.assertRaises(NotebookNotFoundError):
             self.service.get_notebook("other-user", "notebook-1")
@@ -208,6 +242,43 @@ class NotebookWorkspaceTests(unittest.TestCase):
 
         unchanged = self.service.get_notebook("user-1", "notebook-1")
         self.assertEqual(unchanged.title, "Research notebook")
+
+    def test_upload_rejects_non_worker_mode_without_sync_status(self) -> None:
+        with patch(
+            "app.services.notebooks.get_settings",
+            return_value=SimpleNamespace(document_processing_mode="sync", uploads_dir="/tmp", redis_url="redis://test"),
+        ):
+            with self.assertRaises(NotebookValidationError):
+                self.service.upload_document("user-1", "notebook-1", b"%PDF-1.4", "State Machine Diagram.pdf")
+
+        statuses = self.client.tables["document_processing_status"]
+        self.assertFalse(any(row.get("task_id") == "sync-upload" for row in statuses))
+
+    def test_upload_always_queues_worker_task(self) -> None:
+        fake_celery = SimpleNamespace(send_task=Mock())
+
+        with TemporaryDirectory() as uploads_dir:
+            with patch(
+                "app.services.notebooks.get_settings",
+                return_value=SimpleNamespace(
+                    document_processing_mode="worker",
+                    uploads_dir=uploads_dir,
+                    redis_url="redis://test",
+                ),
+            ), patch.object(self.service, "_celery_app", return_value=fake_celery):
+                result = self.service.upload_document(
+                    "user-1",
+                    "notebook-1",
+                    b"%PDF-1.4",
+                    "State Machine Diagram.pdf",
+                )
+
+        statuses = self.client.tables["document_processing_status"]
+        self.assertTrue(result["queued"])
+        self.assertEqual(result["chunks_processed"], 0)
+        self.assertEqual(len(statuses), 1)
+        self.assertNotEqual(statuses[0]["task_id"], "sync-upload")
+        fake_celery.send_task.assert_called_once()
 
     def test_current_chat_reloads_until_new_chat_clears_it(self) -> None:
         session_id, messages = self.service.get_current_chat("user-1", "notebook-1")
@@ -251,6 +322,62 @@ class NotebookWorkspaceTests(unittest.TestCase):
                 ["ready", "still-indexing", "missing"],
             )
 
+    def test_rename_document_updates_status_and_chunks(self) -> None:
+        self.add_document("Old source")
+        self.add_chunk("Old source")
+
+        renamed = self.service.rename_document("user-1", "notebook-1", "Old source", "New source.pdf")
+
+        self.assertEqual(renamed.documents[0].document_name, "New source")
+        self.assertEqual(self.client.tables["document_processing_status"][0]["document_name"], "New source")
+        self.assertEqual(self.client.tables["documents"][0]["document_name"], "New source")
+
+    def test_rename_document_updates_saved_note_and_chat_sources(self) -> None:
+        self.add_document("Old source")
+        self.add_chunk("Old source")
+        self.service.create_note(
+            "user-1",
+            "notebook-1",
+            "Question?",
+            "Saved answer",
+            [{"document": "Old source"}],
+            ["Old source"],
+        )
+        session_id, _ = self.service.get_current_chat("user-1", "notebook-1")
+        self.service._insert_message(session_id, "assistant", "Answer", [{"document": "Old source"}])
+
+        self.service.rename_document("user-1", "notebook-1", "Old source", "New source")
+
+        note = self.service.list_notes("user-1", "notebook-1")[0]
+        messages = self.service._messages(session_id)
+        self.assertEqual(note.document_names, ["New source"])
+        self.assertEqual(note.sources[0]["document"], "New source")
+        self.assertEqual(messages[0].sources[0]["document"], "New source")
+
+    def test_rename_document_rejects_duplicate_name(self) -> None:
+        self.add_document("Existing")
+        self.add_document("Taken")
+
+        with self.assertRaises(NotebookValidationError):
+            self.service.rename_document("user-1", "notebook-1", "Existing", "Taken")
+
+    def test_delete_document_removes_status_even_without_chunks(self) -> None:
+        self.add_document("Queued source", ProcessingStatus.PENDING)
+
+        self.service.delete_document("user-1", "notebook-1", "Queued source")
+        self.service.delete_document("user-1", "notebook-1", "Queued source")
+
+        self.assertEqual(self.client.tables["document_processing_status"], [])
+
+    def test_delete_document_removes_chunks(self) -> None:
+        self.add_document("Indexed source")
+        self.add_chunk("Indexed source")
+
+        self.service.delete_document("user-1", "notebook-1", "Indexed source")
+
+        self.assertEqual(self.client.tables["document_processing_status"], [])
+        self.assertEqual(self.client.tables["documents"], [])
+
     def test_create_note_persists_saved_answer_without_touching_chat(self) -> None:
         session_id, _ = self.service.get_current_chat("user-1", "notebook-1")
         self.service._insert_message(session_id, "assistant", "Temporary answer", [])
@@ -271,6 +398,21 @@ class NotebookWorkspaceTests(unittest.TestCase):
         self.assertEqual(len(notes), 1)
         self.assertEqual(messages, [])
         self.assertEqual(self.service.list_notes("user-1", "notebook-1")[0].answer, "Saved answer")
+
+    def test_update_note_renames_saved_note(self) -> None:
+        note = self.service.create_note("user-1", "notebook-1", "Original title", "Saved answer", [], [])
+
+        renamed = self.service.update_note("user-1", "notebook-1", note.id, "Renamed title")
+
+        self.assertEqual(renamed.question, "Renamed title")
+        self.assertEqual(self.service.list_notes("user-1", "notebook-1")[0].question, "Renamed title")
+
+    def test_delete_note_removes_saved_note(self) -> None:
+        note = self.service.create_note("user-1", "notebook-1", "Question?", "Saved answer", [], [])
+
+        self.service.delete_note("user-1", "notebook-1", note.id)
+
+        self.assertEqual(self.service.list_notes("user-1", "notebook-1"), [])
 
 
 if __name__ == "__main__":

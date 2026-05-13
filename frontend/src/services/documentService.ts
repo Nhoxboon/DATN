@@ -153,8 +153,48 @@ export const documentService = {
     return this.getNotebookDetail(notebookId)
   },
 
+  async renameDocument(notebookId: string, documentName: string, nextDocumentName: string): Promise<NotebookDetail> {
+    const data = await apiFetch<BackendNotebookDetail>(
+      `/notebooks/${encodeURIComponent(notebookId)}/documents/rename`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          current_document_name: documentName,
+          document_name: nextDocumentName,
+        }),
+      },
+    )
+    return toDetail(data)
+  },
+
+  async deleteDocument(notebookId: string, documentName: string): Promise<void> {
+    await apiFetch<void>(
+      `/notebooks/${encodeURIComponent(notebookId)}/documents/${encodeURIComponent(documentName)}`,
+      {
+        method: 'DELETE',
+      },
+    )
+  },
+
   async getNotes(notebookId: string): Promise<StudioDocument[]> {
     const data = await apiFetch<BackendNotebookNote[]>(`/notebooks/${encodeURIComponent(notebookId)}/notes`)
     return data.map(toNote)
+  },
+
+  async renameNote(notebookId: string, noteId: string, title: string): Promise<StudioDocument> {
+    const data = await apiFetch<BackendNotebookNote>(
+      `/notebooks/${encodeURIComponent(notebookId)}/notes/${encodeURIComponent(noteId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ question: title }),
+      },
+    )
+    return toNote(data)
+  },
+
+  async deleteNote(notebookId: string, noteId: string): Promise<void> {
+    await apiFetch<void>(`/notebooks/${encodeURIComponent(notebookId)}/notes/${encodeURIComponent(noteId)}`, {
+      method: 'DELETE',
+    })
   },
 }

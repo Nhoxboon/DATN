@@ -160,6 +160,69 @@ export function useDocuments(notebookId?: string) {
     return renamed
   }
 
+  const renameSource = async (documentName: string, nextDocumentName: string) => {
+    if (!notebookId) {
+      return null
+    }
+
+    const renamed = await documentService.renameDocument(notebookId, documentName, nextDocumentName)
+    const refreshedSummaries = await documentService.getNotebookSummaries()
+    setNotebook(renamed)
+    setSummaries(refreshedSummaries)
+    return renamed
+  }
+
+  const deleteSource = async (documentName: string) => {
+    if (!notebookId) {
+      return
+    }
+
+    await documentService.deleteDocument(notebookId, documentName)
+    const [refreshedSummaries, refreshedNotebook] = await Promise.all([
+      documentService.getNotebookSummaries(),
+      documentService.getNotebookDetail(notebookId),
+    ])
+    setNotebook(refreshedNotebook)
+    setSummaries(refreshedSummaries)
+  }
+
+  const renameNote = async (noteId: string, title: string) => {
+    if (!notebookId) {
+      return null
+    }
+
+    const renamed = await documentService.renameNote(notebookId, noteId, title)
+    setNotebook((current) =>
+      current
+        ? {
+            ...current,
+            studioDocuments: current.studioDocuments.map((document) =>
+              document.id === noteId ? renamed : document,
+            ),
+          }
+        : current,
+    )
+    setSummaries(await documentService.getNotebookSummaries())
+    return renamed
+  }
+
+  const deleteNote = async (noteId: string) => {
+    if (!notebookId) {
+      return
+    }
+
+    await documentService.deleteNote(notebookId, noteId)
+    setNotebook((current) =>
+      current
+        ? {
+            ...current,
+            studioDocuments: current.studioDocuments.filter((document) => document.id !== noteId),
+          }
+        : current,
+    )
+    setSummaries(await documentService.getNotebookSummaries())
+  }
+
   const processUploads = async (files: File[]) => {
     if (!notebookId || !files.length) {
       return
@@ -230,6 +293,10 @@ export function useDocuments(notebookId?: string) {
     createNotebook,
     deleteNotebook,
     renameNotebook,
+    renameSource,
+    deleteSource,
+    renameNote,
+    deleteNote,
     processUploads,
     addStudioDocument,
     reload: load,
