@@ -6,9 +6,9 @@ from typing import Any, Dict, List, Optional
 
 class QueryRequest(BaseModel):
     """Request model for RAG query."""
-    question: str = Field(..., description="Question about PDP8 regulation", min_length=1)
+    question: str = Field(..., description="Question about the selected document context", min_length=1)
     document_name: str = Field(
-        default="PDP8_full-with-annexes_EN",
+        default="",
         description="Document to search"
     )
 

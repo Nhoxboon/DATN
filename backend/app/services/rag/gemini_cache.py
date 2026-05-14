@@ -74,6 +74,7 @@ class GeminiCacheService:
             system_instruction = (
                 "You are an expert document analyst capable of synthesizing information across various domains. "
                 "Answer questions based on the provided document context. "
+                # "answer only from the provided context, "
                 "Use **bold** for key terms, cite sources only with [N] format, preserve tables, "
                 "and treat image or figure descriptions as extracted evidence from document visuals."
             )

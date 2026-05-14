@@ -310,12 +310,12 @@ class NotebookWorkspaceTests(unittest.TestCase):
         session_id, messages = self.service.get_current_chat("user-1", "notebook-1")
         self.assertEqual(messages, [])
 
-        self.service._insert_message(session_id, "user", "What is PDP8?", [])
+        self.service._insert_message(session_id, "user", "What does this document say?", [])
         reloaded_session_id, reloaded_messages = self.service.get_current_chat("user-1", "notebook-1")
 
         self.assertEqual(reloaded_session_id, session_id)
         self.assertEqual(len(reloaded_messages), 1)
-        self.assertEqual(reloaded_messages[0].content, "What is PDP8?")
+        self.assertEqual(reloaded_messages[0].content, "What does this document say?")
 
         new_session_id, new_messages = self.service.new_chat("user-1", "notebook-1")
 

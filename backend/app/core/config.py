@@ -93,6 +93,7 @@ class RAGConfig(BaseModel):
     """RAG settings."""
 
     mode: str
+    optimized_model_path: Optional[str] = None
     retrieval: RetrievalConfig
     generation: GenerationConfig
     multihop: MultiHopConfig

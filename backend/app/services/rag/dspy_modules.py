@@ -5,15 +5,16 @@ from typing import List
 
 
 class GenerateAnswer(dspy.Signature):
-    """Generate an answer based on retrieved context from PDP8 regulation."""
+    """Generate an answer based on retrieved document context."""
 
-    context: str = dspy.InputField(desc="Retrieved text chunks from PDP8 regulation document")
-    question: str = dspy.InputField(desc="User's question about the regulation")
+    context: str = dspy.InputField(desc="Retrieved text chunks from user-provided documents")
+    question: str = dspy.InputField(desc="User's question about the selected documents")
     answer: str = dspy.OutputField(desc="Detailed answer based on the regulation context")
+    # answer: str = dspy.OutputField(desc="Detailed answer based only on the retrieved document context")
 
 
 class RAG(dspy.Module):
-    """DSPy RAG module for PDP8 regulation queries."""
+    """DSPy RAG module for document-grounded queries."""
 
     def __init__(self):
         """Initialize RAG module."""

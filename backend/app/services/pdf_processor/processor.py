@@ -3,7 +3,7 @@
 import io
 import re
 from pathlib import Path
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 from google import genai
 from google.genai import types
 from marker.converters.pdf import PdfConverter
@@ -35,6 +35,7 @@ class PDFProcessor:
     MARKDOWN_IMAGE_PATTERN = re.compile(
         r"!\[(?P<alt>[^\]]*)\]\((?P<path>[^)]+)\)"
     )
+    PAGE_MARKER_PATTERN = re.compile(r"(?:^|\n)\s*\{(?P<page>\d+)\}-{3,}\s*(?=\n|$)")
     IMAGE_FILENAME_PAGE_PATTERN = re.compile(r"(?:^|_)page[_-](?P<page>\d+)", re.IGNORECASE)
     IMAGE_FILENAME_KIND_PATTERN = re.compile(r"(?P<kind>figure|picture|image)", re.IGNORECASE)
 
@@ -62,6 +63,7 @@ class PDFProcessor:
             "gemini_model_name": caption_model,
             "gemini_api_key": settings.google_api_key,
             "extract_tables": True,
+            "paginate_output": True,
         }
         if describe_images:
             config["extract_images"] = True
@@ -143,12 +145,12 @@ class PDFProcessor:
         protected_text, table_markers = self._protect_tables(text)
 
         chunks_result = self.chunker.chunk(protected_text)
-        page_boundaries = self._extract_page_boundaries(text)
+        page_boundaries = self._extract_page_boundaries(protected_text, metadata)
 
         chunks = []
         for idx, chunk in enumerate(chunks_result):
             # Restore tables in chunk text
-            chunk_text = self._restore_tables(chunk.text, table_markers)
+            chunk_text = self._strip_page_markers(self._restore_tables(chunk.text, table_markers))
 
             chunk_pages = self._get_chunk_pages(
                 chunk.start_index,
@@ -358,33 +360,56 @@ class PDFProcessor:
             "and backend/worker logs before re-indexing this document."
         )
 
-    def _extract_page_boundaries(self, text: str) -> List[int]:
+    def _extract_page_boundaries(self, text: str, metadata: Dict[str, Any] | None = None) -> List[Tuple[int, int]]:
         """Extract character positions of page boundaries from markdown."""
-        boundaries = [0]
+        marker_boundaries = [
+            (match.end(), int(match.group("page")) + 1)
+            for match in self.PAGE_MARKER_PATTERN.finditer(text)
+        ]
+        if marker_boundaries:
+            return marker_boundaries
+
+        boundaries: List[Tuple[int, int]] = [(0, 1)]
         lines = text.split('\n')
         current_pos = 0
 
         for line in lines:
-            if '---' in line or 'Page ' in line:
-                boundaries.append(current_pos)
+            stripped = line.strip()
+            if re.fullmatch(r"-{3,}", stripped) or re.match(r"^Page\s+\d+\b", stripped, re.IGNORECASE):
+                boundaries.append((current_pos, len(boundaries) + 1))
             current_pos += len(line) + 1
+
+        if len(boundaries) > 1:
+            return boundaries
+
+        total_pages = (metadata or {}).get("total_pages")
+        if isinstance(total_pages, int) and total_pages > 1 and text:
+            text_length = len(text)
+            return [
+                (round(index * text_length / total_pages), index + 1)
+                for index in range(total_pages)
+            ]
 
         return boundaries
 
-    def _get_chunk_pages(self, start_idx: int, end_idx: int, page_boundaries: List[int]) -> List[int]:
+    def _get_chunk_pages(self, start_idx: int, end_idx: int, page_boundaries: List[Tuple[int, int]]) -> List[int]:
         """Determine which pages a chunk spans."""
         pages = []
 
-        for i, boundary in enumerate(page_boundaries):
+        for i, (boundary, page_number) in enumerate(page_boundaries):
             if i + 1 < len(page_boundaries):
-                next_boundary = page_boundaries[i + 1]
+                next_boundary = page_boundaries[i + 1][0]
                 if start_idx < next_boundary and end_idx > boundary:
-                    pages.append(i + 1)
+                    pages.append(page_number)
             else:
-                if start_idx >= boundary:
-                    pages.append(i + 1)
+                if end_idx > boundary:
+                    pages.append(page_number)
 
-        return pages if pages else [1]
+        return pages if pages else [page_boundaries[0][1] if page_boundaries else 1]
+
+    def _strip_page_markers(self, text: str) -> str:
+        """Remove Marker pagination markers from stored chunk text."""
+        return self.PAGE_MARKER_PATTERN.sub("\n", text).strip()
 
     def _protect_tables(self, text: str) -> tuple[str, Dict[str, str]]:
         """

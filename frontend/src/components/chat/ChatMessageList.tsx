@@ -13,6 +13,95 @@ interface ChatMessageListProps {
 }
 
 const citationPattern = /\[(\d+(?:\s*,\s*\d+)*)\]/g
+const boldPattern = /\*\*(.+?)\*\*/g
+
+function renderBoldText(text: string, keyPrefix: string) {
+  const parts: ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  boldPattern.lastIndex = 0
+  while ((match = boldPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index))
+    }
+    parts.push(
+      <strong key={`${keyPrefix}-bold-${match.index}`} className="font-semibold">
+        {match[1]}
+      </strong>,
+    )
+    lastIndex = match.index + match[0].length
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex))
+  }
+
+  return parts.length ? parts : text
+}
+
+function renderInlineContent(text: string, message: ChatMessage, keyPrefix: string) {
+  const parts: ReactNode[] = []
+  let lastIndex = 0
+  let match: RegExpExecArray | null
+
+  citationPattern.lastIndex = 0
+  while ((match = citationPattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(...renderBoldText(text.slice(lastIndex, match.index), `${keyPrefix}-text-${lastIndex}`))
+    }
+
+    const numbers = match[1].split(/\s*,\s*/).map((value) => Number.parseInt(value, 10))
+    numbers.forEach((number, index) => {
+      const source = message.sources?.[number - 1]
+      parts.push(
+        source ? (
+          <CitationMarker key={`${keyPrefix}-citation-${match?.index}-${number}-${index}`} number={number} source={source} />
+        ) : (
+          <span key={`${keyPrefix}-missing-citation-${match?.index}-${number}-${index}`}>[{number}]</span>
+        ),
+      )
+    })
+
+    lastIndex = match.index + match[0].length
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(...renderBoldText(text.slice(lastIndex), `${keyPrefix}-text-${lastIndex}`))
+  }
+
+  return parts.length ? parts : renderBoldText(text, `${keyPrefix}-text`)
+}
+
+function isUnorderedListItem(line: string) {
+  return /^\s*[-*]\s+/.test(line)
+}
+
+function isOrderedListItem(line: string) {
+  return /^\s*\d+\.\s+/.test(line)
+}
+
+function listItemText(line: string) {
+  return line.replace(/^\s*(?:[-*]|\d+\.)\s+/, '')
+}
+
+function splitTableRow(line: string) {
+  return line
+    .trim()
+    .replace(/^\|/, '')
+    .replace(/\|$/, '')
+    .split('|')
+    .map((cell) => cell.trim())
+}
+
+function isTableSeparator(line: string) {
+  const cells = splitTableRow(line)
+  return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell))
+}
+
+function isTableStart(lines: string[], index: number) {
+  return lines[index]?.includes('|') && Boolean(lines[index + 1]) && isTableSeparator(lines[index + 1])
+}
 
 function sourceSummary(source: RagSource) {
   const similarity =
@@ -116,44 +205,113 @@ function renderMessageContent(message: ChatMessage) {
     )
   }
 
-  const parts: ReactNode[] = []
-  let lastIndex = 0
-  let match: RegExpExecArray | null
+  const lines = message.content.split(/\r?\n/)
+  const blocks: ReactNode[] = []
+  let index = 0
 
-  citationPattern.lastIndex = 0
-  while ((match = citationPattern.exec(message.content)) !== null) {
-    if (match.index > lastIndex) {
-      parts.push(
-        <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-          {message.content.slice(lastIndex, match.index)}
-        </span>,
-      )
+  while (index < lines.length) {
+    const line = lines[index]
+
+    if (!line.trim()) {
+      index += 1
+      continue
     }
 
-    const numbers = match[1].split(/\s*,\s*/).map((value) => Number.parseInt(value, 10))
-    numbers.forEach((number, index) => {
-      const source = message.sources?.[number - 1]
-      parts.push(
-        source ? (
-          <CitationMarker key={`citation-${match?.index}-${number}-${index}`} number={number} source={source} />
-        ) : (
-          <span key={`missing-citation-${match?.index}-${number}-${index}`}>[{number}]</span>
-        ),
+    const heading = /^(#{1,6})\s+(.+)$/.exec(line)
+    if (heading) {
+      blocks.push(
+        <h3 key={`heading-${index}`} className="mt-3 first:mt-0 text-[0.98rem] font-semibold leading-6 text-ink">
+          {renderInlineContent(heading[2], message, `heading-${index}`)}
+        </h3>,
       )
-    })
+      index += 1
+      continue
+    }
 
-    lastIndex = match.index + match[0].length
-  }
+    if (isUnorderedListItem(line) || isOrderedListItem(line)) {
+      const ordered = isOrderedListItem(line)
+      const items: string[] = []
+      while (index < lines.length && (ordered ? isOrderedListItem(lines[index]) : isUnorderedListItem(lines[index]))) {
+        items.push(listItemText(lines[index]))
+        index += 1
+      }
 
-  if (lastIndex < message.content.length) {
-    parts.push(
-      <span key={`text-${lastIndex}`} className="whitespace-pre-wrap">
-        {message.content.slice(lastIndex)}
-      </span>,
+      const ListTag = ordered ? 'ol' : 'ul'
+      blocks.push(
+        <ListTag
+          key={`list-${index}`}
+          className={`my-2 space-y-1 pl-5 ${ordered ? 'list-decimal' : 'list-disc'}`}
+        >
+          {items.map((item, itemIndex) => (
+            <li key={`list-${index}-${itemIndex}`} className="pl-1 leading-7">
+              {renderInlineContent(item, message, `list-${index}-${itemIndex}`)}
+            </li>
+          ))}
+        </ListTag>,
+      )
+      continue
+    }
+
+    if (isTableStart(lines, index)) {
+      const header = splitTableRow(lines[index])
+      index += 2
+      const rows: string[][] = []
+      while (index < lines.length && lines[index].includes('|') && lines[index].trim()) {
+        rows.push(splitTableRow(lines[index]))
+        index += 1
+      }
+
+      blocks.push(
+        <div key={`table-${index}`} className="my-3 max-w-full overflow-x-auto rounded-lg border border-black/8 bg-white">
+          <table className="min-w-full border-collapse text-left text-[0.76rem] leading-5">
+            <thead className="bg-surface-low text-ink">
+              <tr>
+                {header.map((cell, cellIndex) => (
+                  <th key={`table-${index}-head-${cellIndex}`} className="border-b border-black/8 px-3 py-2 font-semibold">
+                    {renderInlineContent(cell, message, `table-${index}-head-${cellIndex}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, rowIndex) => (
+                <tr key={`table-${index}-row-${rowIndex}`} className="border-b border-black/5 last:border-b-0">
+                  {row.map((cell, cellIndex) => (
+                    <td key={`table-${index}-row-${rowIndex}-${cellIndex}`} className="px-3 py-2 align-top">
+                      {renderInlineContent(cell, message, `table-${index}-row-${rowIndex}-${cellIndex}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>,
+      )
+      continue
+    }
+
+    const paragraphLines = [line]
+    index += 1
+    while (
+      index < lines.length &&
+      lines[index].trim() &&
+      !/^(#{1,6})\s+/.test(lines[index]) &&
+      !isUnorderedListItem(lines[index]) &&
+      !isOrderedListItem(lines[index]) &&
+      !isTableStart(lines, index)
+    ) {
+      paragraphLines.push(lines[index])
+      index += 1
+    }
+
+    blocks.push(
+      <p key={`paragraph-${index}`} className="my-2 first:mt-0 last:mb-0 whitespace-pre-wrap leading-7">
+        {renderInlineContent(paragraphLines.join('\n'), message, `paragraph-${index}`)}
+      </p>,
     )
   }
 
-  return parts.length ? parts : <span className="whitespace-pre-wrap">{message.content}</span>
+  return blocks.length ? blocks : <span className="whitespace-pre-wrap">{message.content}</span>
 }
 
 export function ChatMessageList({ messages, intro, onSaveNote, savingNoteId }: ChatMessageListProps) {

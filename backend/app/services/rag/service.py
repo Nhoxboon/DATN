@@ -1,4 +1,4 @@
-"""RAG service for PDP8 regulation queries."""
+"""RAG service for document-grounded notebook queries."""
 
 import dspy
 import dspy.streaming  # type: ignore
@@ -25,7 +25,7 @@ def _citation_numbers(match: re.Match[str]) -> list[int]:
 
 
 class RAGService:
-    """Service for answering questions about PDP8 regulation using optimized RAG."""
+    """Service for answering questions from user-provided document context."""
 
     def __init__(self, use_optimized: bool = True, configure_dspy: bool = True):
         """
@@ -92,10 +92,11 @@ class RAGService:
             self.mode = "multi-hop"
             self.is_optimized = False
         elif mode == "single-hop":
-            # Use single-hop (optimized if available)
-            if use_optimized and Path("models/optimized_rag.json").exists():
+            optimized_model_path = self.app_config.rag.optimized_model_path
+            # Domain-specific optimized models must be explicitly configured.
+            if use_optimized and optimized_model_path and Path(optimized_model_path).exists():
                 self.rag = load_optimized_model(
-                    "models/optimized_rag.json",
+                    optimized_model_path,
                     self.retrieval_service
                 )
                 self.is_optimized = True

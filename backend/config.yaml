@@ -37,6 +37,7 @@ vector_db:
 # RAG Configuration
 rag:
   mode: "adaptive"  # "adaptive", "single-hop", "multi-hop"
+  optimized_model_path: null  # Optional DSPy optimized model path; keep null for domain-neutral notebooks
   retrieval:
     top_k: 10
     similarity_threshold: 0.7

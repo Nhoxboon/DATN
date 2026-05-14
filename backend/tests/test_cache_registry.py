@@ -45,8 +45,8 @@ class FakeRedis:
 
 class CacheRegistryTests(unittest.TestCase):
     def test_cache_key_includes_notebook_scope(self) -> None:
-        key_a = build_document_cache_key("notebook-a", ["PDP8"])
-        key_b = build_document_cache_key("notebook-b", ["PDP8"])
+        key_a = build_document_cache_key("notebook-a", ["Design Notes"])
+        key_b = build_document_cache_key("notebook-b", ["Design Notes"])
 
         self.assertNotEqual(key_a, key_b)
         self.assertTrue(key_a.startswith("gemini_cache:notebook-a:docs:"))

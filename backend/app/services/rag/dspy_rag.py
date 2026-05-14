@@ -7,14 +7,15 @@ class GenerateAnswer(dspy.Signature):
     """Generate a comprehensive answer from context with citations."""
 
     context: str = dspy.InputField(
-        desc="Retrieved passages from PDP8 regulation document, may include markdown tables and image/figure descriptions"
+        desc="Retrieved passages from user-provided documents, may include markdown tables and image/figure descriptions"
     )
     question: str = dspy.InputField(
-        desc="User's question about Vietnam's electricity development plan"
+        desc="User's question about the selected document context"
     )
     answer: str = dspy.OutputField(
         desc="Comprehensive answer in clear paragraphs. Use **bold** for key terms. "
              "Cite sources only with [N] format. Separate different aspects into distinct paragraphs with blank lines. "
+            #  "Answer only from the provided context; say when the documents do not contain enough evidence. "
              "IMPORTANT: If the context contains markdown tables with relevant data, preserve them in your answer using proper markdown table syntax. "
              "If the context contains image or figure descriptions, treat them as extracted evidence from the document visuals. "
              "Present numerical data, lists of projects, or comparisons in table format when appropriate."
