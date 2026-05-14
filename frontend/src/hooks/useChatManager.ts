@@ -35,6 +35,14 @@ function findQuestion(messages: ChatMessage[], assistantMessageId: string) {
   return ''
 }
 
+function answerModeFromStrategy(strategy?: string | null): ChatMessage['answerMode'] {
+  if (!strategy) {
+    return undefined
+  }
+
+  return strategy.toLowerCase().includes('multi') ? 'multihop' : 'singlehop'
+}
+
 export function useChatManager(notebookId?: string) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isPending, setIsPending] = useState(false)
@@ -111,11 +119,62 @@ export function useChatManager(notebookId?: string) {
         )
       }, 1400)
 
+      let receivedStreamEvent = false
+
       try {
-        const nextMessages = await chatService.sendMessage(notebookId, input, documentNames)
-        setMessages(nextMessages)
+        await chatService.sendMessageStream(notebookId, input, documentNames, {
+          onToken: (content) => {
+            receivedStreamEvent = true
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === localAssistantId
+                  ? {
+                      ...message,
+                      content: `${message.content}${content}`,
+                      pending: false,
+                      progressLabel: undefined,
+                    }
+                  : message,
+              ),
+            )
+          },
+          onMetadata: (metadata) => {
+            receivedStreamEvent = true
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === localAssistantId
+                  ? {
+                      ...message,
+                      sources: metadata.sources || [],
+                      strategy: metadata.strategy,
+                      strategyReasoning: metadata.strategy_reasoning,
+                      answerMode: answerModeFromStrategy(metadata.strategy),
+                    }
+                  : message,
+              ),
+            )
+          },
+          onDone: (nextMessages) => {
+            receivedStreamEvent = true
+            setMessages(nextMessages)
+          },
+          onError: () => {
+            receivedStreamEvent = true
+          },
+        })
       } catch (err) {
-        const errorMessage = (err as Error).message
+        let finalError = err
+        if (!receivedStreamEvent) {
+          try {
+            const nextMessages = await chatService.sendMessage(notebookId, input, documentNames)
+            setMessages(nextMessages)
+            return
+          } catch (fallbackErr) {
+            finalError = fallbackErr
+          }
+        }
+
+        const errorMessage = (finalError as Error).message
         setError(errorMessage)
         setMessages((current) =>
           current.map((message) =>

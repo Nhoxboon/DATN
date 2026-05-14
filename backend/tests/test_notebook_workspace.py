@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 from uuid import uuid4
 
 from app.db.processing_status import ProcessingStatus
@@ -170,6 +170,9 @@ class NotebookWorkspaceTests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = FakeSupabaseClient()
         self.service = NotebookWorkspaceService(self.client)
+        self.invalidate_patcher = patch("app.services.notebooks.invalidate_document_caches")
+        self.invalidate_patcher.start()
+        self.addCleanup(self.invalidate_patcher.stop)
         self.notebook = self.client.insert_row(
             "notebooks",
             {
@@ -280,6 +283,29 @@ class NotebookWorkspaceTests(unittest.TestCase):
         self.assertNotEqual(statuses[0]["task_id"], "sync-upload")
         fake_celery.send_task.assert_called_once()
 
+    def test_upload_invalidates_normalized_document_cache_before_queueing(self) -> None:
+        fake_celery = SimpleNamespace(send_task=Mock())
+
+        with TemporaryDirectory() as uploads_dir:
+            with patch(
+                "app.services.notebooks.get_settings",
+                return_value=SimpleNamespace(
+                    document_processing_mode="worker",
+                    uploads_dir=uploads_dir,
+                    redis_url="redis://test",
+                ),
+            ), patch.object(self.service, "_celery_app", return_value=fake_celery), patch(
+                "app.services.notebooks.invalidate_document_caches"
+            ) as invalidate:
+                self.service.upload_document(
+                    "user-1",
+                    "notebook-1",
+                    b"%PDF-1.4",
+                    "State Machine Diagram.pdf",
+                )
+
+        invalidate.assert_called_once_with("notebook-1", "State Machine Diagram")
+
     def test_current_chat_reloads_until_new_chat_clears_it(self) -> None:
         session_id, messages = self.service.get_current_chat("user-1", "notebook-1")
         self.assertEqual(messages, [])
@@ -311,6 +337,29 @@ class NotebookWorkspaceTests(unittest.TestCase):
         self.assertEqual(len(result["messages"]), 2)
         self.assertEqual(result["messages"][1].content, "Indexed answer\n\nNguồn: [1]")
 
+    def test_stream_chat_begin_and_finalize_persists_messages(self) -> None:
+        self.add_document("doc-a")
+
+        prepared = self.service.begin_chat_message("user-1", "notebook-1", " What changed? ", ["doc-a"])
+        result = self.service.finalize_chat_message(
+            "user-1",
+            "notebook-1",
+            str(prepared["session_id"]),
+            "Streamed answer [1]",
+            [{"document": "doc-a", "page_range": "1", "similarity": 0.9}],
+            "cached-single-hop",
+            "manifest citations",
+        )
+
+        self.assertEqual(prepared["message"], "What changed?")
+        self.assertEqual(prepared["document_names"], ["doc-a"])
+        self.assertEqual(result["answer"], "Streamed answer [1]")
+        self.assertEqual(result["strategy"], "cached-single-hop")
+        self.assertEqual(len(result["messages"]), 2)
+        self.assertEqual(result["messages"][0].role, "user")
+        self.assertEqual(result["messages"][1].role, "assistant")
+        self.assertEqual(result["messages"][1].sources[0]["document"], "doc-a")
+
     def test_selected_documents_must_be_completed(self) -> None:
         self.add_document("ready")
         self.add_document("still-indexing", ProcessingStatus.PROCESSING)
@@ -331,6 +380,21 @@ class NotebookWorkspaceTests(unittest.TestCase):
         self.assertEqual(renamed.documents[0].document_name, "New source")
         self.assertEqual(self.client.tables["document_processing_status"][0]["document_name"], "New source")
         self.assertEqual(self.client.tables["documents"][0]["document_name"], "New source")
+
+    def test_rename_document_invalidates_old_and_new_cache_names(self) -> None:
+        self.add_document("Old source")
+        self.add_chunk("Old source")
+
+        with patch("app.services.notebooks.invalidate_document_caches") as invalidate:
+            self.service.rename_document("user-1", "notebook-1", "Old source", "New source.pdf")
+
+        self.assertEqual(
+            invalidate.call_args_list,
+            [
+                call("notebook-1", "Old source"),
+                call("notebook-1", "New source"),
+            ],
+        )
 
     def test_rename_document_updates_saved_note_and_chat_sources(self) -> None:
         self.add_document("Old source")
@@ -377,6 +441,16 @@ class NotebookWorkspaceTests(unittest.TestCase):
 
         self.assertEqual(self.client.tables["document_processing_status"], [])
         self.assertEqual(self.client.tables["documents"], [])
+
+    def test_delete_document_invalidates_existing_document_cache_only(self) -> None:
+        self.add_document("Indexed source")
+        self.add_chunk("Indexed source")
+
+        with patch("app.services.notebooks.invalidate_document_caches") as invalidate:
+            self.service.delete_document("user-1", "notebook-1", "Indexed source")
+            self.service.delete_document("user-1", "notebook-1", "Indexed source")
+
+        invalidate.assert_called_once_with("notebook-1", "Indexed source")
 
     def test_create_note_persists_saved_answer_without_touching_chat(self) -> None:
         session_id, _ = self.service.get_current_chat("user-1", "notebook-1")

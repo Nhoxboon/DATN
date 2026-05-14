@@ -13,6 +13,7 @@ from app.services.storage import StorageService
 from app.db.dependencies import get_supabase_client
 from app.db.processing_status import get_processing_status_repository, ProcessingStatus
 from app.db.repository import get_document_repository
+from app.services.rag.cache_registry import invalidate_document_caches
 from app.workers.tasks.embedding import generate_embedding_and_store_task
 from app.workers.tasks.storage import finalize_document_task
 from app.core.document_naming import safe_pdf_storage_path
@@ -170,6 +171,7 @@ def extract_and_chunk_task(self, notebook_id: str, user_id: str, document_name: 
 
         # Replace existing chunks for this document so re-indexing writes a
         # clean image-aware corpus instead of duplicating stale text-only rows.
+        invalidate_document_caches(notebook_id, document_name)
         doc_repo.delete_by_name(document_name, notebook_id)
 
         # Update total chunks

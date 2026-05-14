@@ -1,9 +1,11 @@
 """Notebook workspace routes."""
 
+import json
 import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi.responses import StreamingResponse
 
 from app.db.dependencies import get_supabase_admin_client
 from app.schemas.auth import CurrentUser
@@ -29,6 +31,7 @@ from app.services.notebooks import (
     NotebookWorkspaceService,
     get_notebook_workspace_service,
 )
+from app.services.rag.dependencies import get_rag_service
 
 
 router = APIRouter(prefix="/notebooks", tags=["notebooks"])
@@ -299,6 +302,92 @@ async def send_chat_message(
     except Exception as exc:
         _handle_notebook_error(exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+
+@router.post("/{notebook_id}/chat/messages/stream")
+async def send_chat_message_stream(
+    notebook_id: str,
+    payload: ChatSendRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    service: NotebookWorkspaceService = Depends(get_workspace_service),
+) -> StreamingResponse:
+    """Save a user question, stream notebook-scoped RAG tokens, and save the AI reply."""
+    try:
+        logger.info(
+            "POST /notebooks/%s/chat/messages/stream user_id=%s selected_documents=%s",
+            notebook_id,
+            current_user.id,
+            payload.document_names,
+        )
+        prepared = service.begin_chat_message(
+            current_user.id,
+            notebook_id,
+            payload.message,
+            payload.document_names,
+        )
+    except Exception as exc:
+        _handle_notebook_error(exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+    def ndjson_event(event: dict[str, Any]) -> str:
+        return json.dumps(event, default=str) + "\n"
+
+    async def event_generator():
+        full_answer = ""
+        metadata: dict[str, Any] = {}
+
+        try:
+            rag_service = get_rag_service()
+            async for chunk in rag_service.query_stream(
+                question=str(prepared["message"]),
+                notebook_id=notebook_id,
+                doc_names=prepared["document_names"],
+            ):
+                if chunk.get("type") == "token":
+                    content = str(chunk.get("content", ""))
+                    full_answer += content
+                    yield ndjson_event({"type": "token", "content": content})
+                elif chunk.get("type") == "metadata":
+                    metadata = chunk
+                    yield ndjson_event(
+                        {
+                            "type": "metadata",
+                            "strategy": chunk.get("strategy"),
+                            "strategy_reasoning": chunk.get("strategy_reasoning"),
+                            "sources": chunk.get("sources", []),
+                        }
+                    )
+
+            result = service.finalize_chat_message(
+                current_user.id,
+                notebook_id,
+                str(prepared["session_id"]),
+                full_answer,
+                metadata.get("sources", []),
+                metadata.get("strategy"),
+                metadata.get("strategy_reasoning"),
+            )
+            yield ndjson_event(
+                {
+                    "type": "done",
+                    "session_id": result["session_id"],
+                    "messages": [message.model_dump() for message in result["messages"]],
+                    "strategy": result.get("strategy"),
+                    "strategy_reasoning": result.get("strategy_reasoning"),
+                }
+            )
+        except Exception as exc:
+            logger.exception("Notebook streaming chat failed notebook_id=%s user_id=%s", notebook_id, current_user.id)
+            yield ndjson_event({"type": "error", "message": str(exc)})
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="application/x-ndjson",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/{notebook_id}/chat/new", response_model=ChatCurrentResponse)

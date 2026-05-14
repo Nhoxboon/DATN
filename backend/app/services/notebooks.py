@@ -15,6 +15,7 @@ from app.core.config import get_settings
 from app.core.document_naming import document_name_from_filename, normalize_document_name, safe_pdf_storage_path
 from app.db.processing_status import ProcessingStatus, get_processing_status_repository
 from app.db.repository import get_document_repository
+from app.services.rag.cache_registry import invalidate_document_caches
 from app.schemas.notebooks import (
     ChatMessageOut,
     DocumentStatus,
@@ -151,6 +152,7 @@ class NotebookWorkspaceService:
                     "Document upload requires worker mode. Set DOCUMENT_PROCESSING_MODE=worker "
                     "and run the Celery worker."
                 )
+            self._invalidate_document_cache(notebook_id, document_name)
 
             task_id = str(uuid4())
             upload_dir = Path(settings.uploads_dir) / user_id / notebook_id
@@ -216,6 +218,7 @@ class NotebookWorkspaceService:
         self._revoke_processing_task(source)
         get_document_repository(self.client).delete_by_name(clean_document_name, notebook_id)
         get_processing_status_repository(self.client).delete_status(notebook_id, clean_document_name)
+        self._invalidate_document_cache(notebook_id, clean_document_name)
         self._delete_storage_paths(storage_paths)
         self._delete_local_upload(user_id, notebook_id, clean_document_name)
         self._touch_notebook(user_id, notebook_id)
@@ -264,6 +267,8 @@ class NotebookWorkspaceService:
             .eq("document_name", current_name)
             .execute()
         )
+        self._invalidate_document_cache(notebook_id, current_name)
+        self._invalidate_document_cache(notebook_id, next_name)
         self._rename_document_references(user_id, notebook_id, current_name, next_name)
         self._rename_local_upload(user_id, notebook_id, current_name, next_name)
         self._touch_notebook(user_id, notebook_id)
@@ -319,6 +324,57 @@ class NotebookWorkspaceService:
             "sources": sources,
             "strategy": result.get("strategy"),
             "strategy_reasoning": result.get("strategy_reasoning"),
+        }
+
+    def begin_chat_message(
+        self,
+        user_id: str,
+        notebook_id: str,
+        message: str,
+        document_names: list[str],
+    ) -> dict[str, Any]:
+        """Validate and persist the user side of a streaming chat message."""
+        self._require_notebook(user_id, notebook_id)
+        selected_documents = self._validate_completed_documents(user_id, notebook_id, document_names)
+        clean_message = message.strip()
+
+        session = self._get_or_create_session(user_id, notebook_id)
+        session_id = str(session["id"])
+        self._insert_message(session_id, "user", clean_message, [])
+        self._touch_chat_session(session_id)
+        self._touch_notebook(user_id, notebook_id)
+
+        return {
+            "session_id": session_id,
+            "message": clean_message,
+            "document_names": selected_documents,
+        }
+
+    def finalize_chat_message(
+        self,
+        user_id: str,
+        notebook_id: str,
+        session_id: str,
+        answer: str,
+        sources: list[dict[str, Any]],
+        strategy: str | None = None,
+        strategy_reasoning: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist the assistant side of a streaming chat message."""
+        self._require_notebook(user_id, notebook_id)
+        final_answer = self._answer_with_fallback_citations(answer, sources)
+
+        self._insert_message(session_id, "assistant", final_answer, sources)
+        self._touch_chat_session(session_id)
+        self._touch_notebook(user_id, notebook_id)
+        messages = self._messages(session_id)
+        return {
+            "session_id": session_id,
+            "messages": messages,
+            "answer": final_answer,
+            "sources": sources,
+            "strategy": strategy,
+            "strategy_reasoning": strategy_reasoning,
         }
 
     def list_notes(self, user_id: str, notebook_id: str) -> list[NotebookNote]:
@@ -605,6 +661,17 @@ class NotebookWorkspaceService:
 
     def _touch_chat_session(self, session_id: str) -> None:
         self.client.table("chat_sessions").update({"updated_at": _utc_now()}).eq("id", session_id).execute()
+
+    def _invalidate_document_cache(self, notebook_id: str, document_name: str) -> None:
+        try:
+            invalidate_document_caches(notebook_id, document_name)
+        except Exception:
+            logger.info(
+                "Could not invalidate Gemini cache notebook_id=%s document=%s.",
+                notebook_id,
+                document_name,
+                exc_info=True,
+            )
 
     def _clean_document_title(self, value: str) -> str:
         clean_value = normalize_document_name(value)

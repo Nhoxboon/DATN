@@ -20,7 +20,7 @@ class GenerateAnswer(dspy.Signature):
     question: str = dspy.InputField(desc="Question to answer")
     answer: str = dspy.OutputField(
         desc="Comprehensive answer in clear paragraphs. Use **bold** for key terms. "
-             "Cite sources with [N] format. Separate different aspects into distinct paragraphs with blank lines. "
+             "Cite sources only with [N] format. Separate different aspects into distinct paragraphs with blank lines. "
              "IMPORTANT: If the context contains markdown tables with relevant data, preserve them in your answer using proper markdown table syntax. "
              "If the context contains image or figure descriptions, treat them as extracted evidence from the document visuals. "
              "Present numerical data, lists of projects, or comparisons in table format when appropriate."

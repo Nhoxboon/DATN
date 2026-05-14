@@ -7,7 +7,31 @@ import type {
   RagSource,
   StudioDocument,
 } from '../types'
-import { apiFetch } from './api'
+import { apiFetch, apiRequest } from './api'
+
+interface ChatStreamMetadata {
+  sources?: RagSource[]
+  strategy?: string | null
+  strategy_reasoning?: string | null
+}
+
+interface ChatStreamDone extends ChatStreamMetadata {
+  session_id: string
+  messages: BackendChatMessage[]
+}
+
+interface ChatStreamHandlers {
+  onToken: (content: string) => void
+  onMetadata: (metadata: ChatStreamMetadata) => void
+  onDone: (messages: ChatMessage[]) => void
+  onError?: (message: string) => void
+}
+
+type ChatStreamEvent =
+  | { type: 'token'; content?: string }
+  | ({ type: 'metadata' } & ChatStreamMetadata)
+  | ({ type: 'done' } & ChatStreamDone)
+  | { type: 'error'; message?: string }
 
 function timeLabel(value: string) {
   const date = new Date(value)
@@ -65,6 +89,84 @@ function withResponseStrategy(messages: ChatMessage[], data: BackendChatSendResp
   )
 }
 
+function withStreamStrategy(messages: ChatMessage[], data: ChatStreamMetadata) {
+  const assistantIndex = messages.findLastIndex((message) => message.role === 'assistant')
+  if (assistantIndex === -1 || !data.strategy) {
+    return messages
+  }
+
+  return messages.map((message, index) =>
+    index === assistantIndex
+      ? {
+          ...message,
+          strategy: data.strategy,
+          strategyReasoning: data.strategy_reasoning,
+          answerMode: answerModeFromStrategy(data.strategy),
+        }
+      : message,
+  )
+}
+
+function handleStreamEvent(event: ChatStreamEvent, handlers: ChatStreamHandlers) {
+  if (event.type === 'token') {
+    handlers.onToken(event.content || '')
+    return
+  }
+
+  if (event.type === 'metadata') {
+    handlers.onMetadata({
+      sources: event.sources || [],
+      strategy: event.strategy,
+      strategy_reasoning: event.strategy_reasoning,
+    })
+    return
+  }
+
+  if (event.type === 'done') {
+    handlers.onDone(withStreamStrategy(toMessages(event.messages), event))
+    return
+  }
+
+  if (event.type === 'error') {
+    const message = event.message || 'Streaming response failed'
+    handlers.onError?.(message)
+    throw new Error(message)
+  }
+}
+
+async function readNdjsonStream(response: Response, handlers: ChatStreamHandlers) {
+  if (!response.body) {
+    throw new Error('Streaming is not supported by this browser.')
+  }
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  const processLine = (line: string) => {
+    const trimmed = line.trim()
+    if (!trimmed) {
+      return
+    }
+    handleStreamEvent(JSON.parse(trimmed) as ChatStreamEvent, handlers)
+  }
+
+  while (true) {
+    const { value, done } = await reader.read()
+    if (done) {
+      break
+    }
+
+    buffer += decoder.decode(value, { stream: true })
+    const lines = buffer.split(/\r?\n/)
+    buffer = lines.pop() || ''
+    lines.forEach(processLine)
+  }
+
+  buffer += decoder.decode()
+  processLine(buffer)
+}
+
 function toStudioDocument(note: BackendNotebookNote): StudioDocument {
   const excerpt = note.answer.replace(/\s+/g, ' ').slice(0, 150)
 
@@ -106,6 +208,31 @@ export const chatService = {
     )
 
     return withResponseStrategy(toMessages(data.messages), data)
+  },
+
+  async sendMessageStream(
+    notebookId: string,
+    input: string,
+    documentNames: string[],
+    handlers: ChatStreamHandlers,
+  ): Promise<void> {
+    const response = await apiRequest(
+      `/notebooks/${encodeURIComponent(notebookId)}/chat/messages/stream`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          message: input,
+          document_names: documentNames,
+        }),
+      },
+    )
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}))
+      throw new Error(data.detail || `Request failed with status ${response.status}`)
+    }
+
+    await readNdjsonStream(response, handlers)
   },
 
   async newChat(notebookId: string): Promise<ChatMessage[]> {

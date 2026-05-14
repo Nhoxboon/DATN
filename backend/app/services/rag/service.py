@@ -2,6 +2,7 @@
 
 import dspy
 import dspy.streaming  # type: ignore
+import re
 from pathlib import Path
 from typing import Dict, Any, AsyncGenerator, Union, Optional, List
 from app.core.config import get_settings, get_app_config
@@ -13,6 +14,14 @@ from app.services.rag.multihop_rag import MultiHopRAG
 from app.services.rag.adaptive_rag import AdaptiveRAG
 from app.services.rag.trainer import load_optimized_model
 from app.services.rag.gemini_cache import GeminiCacheService
+from app.services.rag.cache_registry import build_document_cache_key, build_document_cache_manifest_key
+
+
+CITATION_PATTERN = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
+
+
+def _citation_numbers(match: re.Match[str]) -> list[int]:
+    return [int(value.strip()) for value in match.group(1).split(",")]
 
 
 class RAGService:
@@ -128,6 +137,39 @@ class RAGService:
             "image_url": metadata.get("image_url")
         }
 
+    @staticmethod
+    def _resolve_manifest_citations(
+        answer: str,
+        source_manifest: List[Dict[str, Any]]
+    ) -> Optional[tuple[str, List[Dict[str, Any]]]]:
+        """Rewrite cached answer citations to match sources from the cached source manifest."""
+        matches = list(CITATION_PATTERN.finditer(answer))
+        if not matches:
+            return None
+
+        source_index_map: dict[int, int] = {}
+        resolved_sources: List[Dict[str, Any]] = []
+
+        for match in matches:
+            for source_number in _citation_numbers(match):
+                if source_number < 1 or source_number > len(source_manifest):
+                    return None
+                if source_number not in source_index_map:
+                    source_index_map[source_number] = len(resolved_sources) + 1
+                    resolved_sources.append(source_manifest[source_number - 1])
+
+        def replace_citation(match: re.Match[str]) -> str:
+            compact_numbers = []
+            seen_numbers = set()
+            for source_number in _citation_numbers(match):
+                compact_number = source_index_map[source_number]
+                if compact_number not in seen_numbers:
+                    compact_numbers.append(str(compact_number))
+                    seen_numbers.add(compact_number)
+            return f"[{', '.join(compact_numbers)}]"
+
+        return CITATION_PATTERN.sub(replace_citation, answer), resolved_sources
+
     def query(
         self,
         question: str,
@@ -213,9 +255,17 @@ class RAGService:
 
         # Fast path: Use cached context for document-filtered queries (single or multiple)
         if effective_doc_names and len(effective_doc_names) <= 3:  # Support up to 3 documents with caching
-            # Create a combined cache key for multiple documents
-            cache_key = "|".join(sorted(effective_doc_names))
+            # Create a notebook-scoped combined cache key for multiple documents
+            cache_key = build_document_cache_key(notebook_id, effective_doc_names)
+            manifest_key = build_document_cache_manifest_key(notebook_id, effective_doc_names)
             cache_name = self.cache_service.get_cache_name(cache_key)
+            source_manifest = self.cache_service.get_cache_manifest(manifest_key)
+
+            # Old cache entries created before manifests are unsafe for citation display.
+            if cache_name and not source_manifest:
+                print(f"[CACHE] Cache manifest missing for {cache_key}; recreating cache")
+                self.cache_service.delete_cache(cache_key)
+                cache_name = None
 
             # If cache doesn't exist, create it
             if not cache_name:
@@ -228,50 +278,55 @@ class RAGService:
                     notebook_id
                 )
                 print(f"[CACHE] Fetched {len(chunks)} total chunks from {len(effective_doc_names)} document(s)")
+                source_manifest = [
+                    self._format_source(chunk)
+                    for chunk in chunks
+                ]
                 cache_name = await asyncio.to_thread(
                     self.cache_service.create_document_cache,
                     cache_key,
                     chunks,
+                    source_manifest,
+                    manifest_key,
                     ttl_hours=1
                 )
+                source_manifest = self.cache_service.get_cache_manifest(manifest_key)
                 print(f"[CACHE] Cache created in {time.time() - start:.2f}s")
 
             # Use cached generation if cache exists
-            if cache_name:
+            if cache_name and source_manifest:
                 num_docs = len(effective_doc_names)
                 strategy = f"cached-{'single' if num_docs == 1 else 'multi'}-hop"
                 print(f"[CACHE] Using cached context for {num_docs} document(s)")
                 try:
-                    # Do retrieval in parallel for source attribution (needed by FE)
-                    retrieval_task = asyncio.create_task(
-                        asyncio.to_thread(
-                            self.retrieval_service.retrieve,
-                            query=question,
-                            doc_names=effective_doc_names
-                        )
-                    )
-
-                    # Stream from cached context (fast generation)
-                    async for token in self.cache_service.generate_with_cache_stream(
+                    cached_answer = await asyncio.to_thread(
+                        self.cache_service.generate_with_cache,
                         cache_name=cache_name,
                         question=question,
                         temperature=self.app_config.llm.gemini.temperature,
                         max_tokens=self.app_config.llm.gemini.max_tokens
-                    ):
-                        yield {"type": "token", "content": token}
+                    )
 
-                    # Wait for retrieval to finish and get sources
-                    retrieved_chunks = await retrieval_task
-                    sources = [
-                        self._format_source(chunk)
-                        for chunk in retrieved_chunks
-                    ]
+                    resolved = self._resolve_manifest_citations(cached_answer, source_manifest)
+                    if not resolved:
+                        raise ValueError("Cached answer did not produce resolvable source citations.")
+
+                    answer, sources = resolved
+
+                    # Stream the validated cached answer after citation resolution.
+                    for token in re.split(r"(\s+)", answer):
+                        if token:
+                            yield {"type": "token", "content": token}
+                            if token.strip():
+                                await asyncio.sleep(0.01)
 
                     # Yield metadata with sources
                     yield {
                         "type": "metadata",
                         "strategy": strategy,
-                        "strategy_reasoning": f"Using cached context from {num_docs} document(s) with retrieval for sources",
+                        "strategy_reasoning": (
+                            f"Using cached context from {num_docs} document(s) with manifest-backed citations"
+                        ),
                         "sources": sources,
                         "is_optimized": True
                     }
@@ -319,7 +374,6 @@ class RAGService:
                     break
                 elif msg_type == "error":
                     # Fallback to simulated streaming on error
-                    import re
                     result = await asyncio.to_thread(self.query, question, notebook_id, None, effective_doc_names)
                     answer = result.get("answer", "")
                     tokens = re.split(r'(\s+)', answer)
@@ -441,7 +495,6 @@ class RAGService:
                 if not streamed_tokens and hasattr(chunk, 'answer'):
                     answer = chunk.answer
                     # Stream word-by-word while preserving newlines
-                    import re
                     # Split by spaces but keep newlines as separate tokens
                     tokens = re.split(r'(\s+)', answer)
                     for i, token in enumerate(tokens):
