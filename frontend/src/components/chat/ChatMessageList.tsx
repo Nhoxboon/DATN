@@ -104,12 +104,13 @@ function isTableStart(lines: string[], index: number) {
 }
 
 function sourceSummary(source: RagSource) {
-  const similarity =
-    typeof source.similarity === 'number' && Number.isFinite(source.similarity)
-      ? ` - ${(source.similarity * 100).toFixed(1)}% relevance`
-      : ''
+  return `${source.document || 'Unknown document'}${source.page_range ? ` - pages ${source.page_range}` : ''}${formatRelevance(source)}`
+}
 
-  return `${source.document || 'Unknown document'}${source.page_range ? ` - pages ${source.page_range}` : ''}${similarity}`
+function formatRelevance(source: RagSource) {
+  return typeof source.similarity === 'number' && Number.isFinite(source.similarity) && source.similarity > 0
+    ? ` - ${(source.similarity * 100).toFixed(1)}% relevance`
+    : ''
 }
 
 function CitationMarker({ number, source }: { number: number; source: RagSource }) {
@@ -148,9 +149,7 @@ function CitationMarker({ number, source }: { number: number; source: RagSource 
             <div className="font-semibold text-primary">{source.document || 'Unknown document'}</div>
             <div className="mt-1 text-[0.68rem] text-muted">
               {source.page_range ? `Pages ${source.page_range}` : 'Pages unknown'}
-              {typeof source.similarity === 'number' && Number.isFinite(source.similarity)
-                ? ` - ${(source.similarity * 100).toFixed(1)}% relevance`
-                : ''}
+              {formatRelevance(source)}
             </div>
             {source.has_visual && (
               <div className="mt-2 inline-flex rounded-full bg-[rgba(0,91,192,0.1)] px-2 py-0.5 text-[0.62rem] font-semibold text-primary">
@@ -312,6 +311,20 @@ function renderMessageContent(message: ChatMessage) {
   }
 
   return blocks.length ? blocks : <span className="whitespace-pre-wrap">{message.content}</span>
+}
+
+export function RichAnswerContent({ content, sources }: { content: string; sources?: RagSource[] }) {
+  return (
+    <>
+      {renderMessageContent({
+        id: 'rich-answer',
+        role: 'assistant',
+        content,
+        timestamp: '',
+        sources,
+      })}
+    </>
+  )
 }
 
 export function ChatMessageList({ messages, intro, onSaveNote, savingNoteId }: ChatMessageListProps) {

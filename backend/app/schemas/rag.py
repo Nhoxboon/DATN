@@ -17,9 +17,10 @@ class SourceInfo(BaseModel):
     """Source information for retrieved chunks."""
     content: str
     document: str
+    chunk_id: Optional[int] = None
     pages: List[int]
     page_range: str
-    similarity: float
+    similarity: Optional[float] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
     content_type: str = "text"
     has_visual: bool = False

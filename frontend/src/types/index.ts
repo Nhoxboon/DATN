@@ -109,9 +109,10 @@ export interface BackendNotebookDetail extends BackendNotebookSummary {
 export interface RagSource {
   content: string
   document: string
+  chunk_id?: number | null
   pages?: number[]
   page_range: string
-  similarity: number
+  similarity?: number | null
   metadata?: Record<string, unknown>
   content_type?: string
   has_visual?: boolean

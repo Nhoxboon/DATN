@@ -2,6 +2,7 @@
 
 import dspy
 import dspy.streaming  # type: ignore
+import math
 import re
 from pathlib import Path
 from typing import Dict, Any, AsyncGenerator, Union, Optional, List
@@ -123,20 +124,115 @@ class RAGService:
         return None
 
     @staticmethod
+    def _coerce_chunk_id(value: Any) -> Optional[int]:
+        if isinstance(value, bool) or value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _is_valid_similarity(value: Any) -> bool:
+        if isinstance(value, bool) or value is None:
+            return False
+        try:
+            return math.isfinite(float(value))
+        except (TypeError, ValueError):
+            return False
+
+    @staticmethod
     def _format_source(chunk: Dict[str, Any]) -> Dict[str, Any]:
         """Format a retrieved chunk for API responses and frontend citations."""
         metadata = chunk.get("metadata") or {}
-        return {
+        source = {
             "content": chunk.get("content", ""),
             "document": chunk.get("document_name", ""),
             "pages": chunk.get("pages", []),
             "page_range": chunk.get("page_range", "unknown"),
-            "similarity": chunk.get("similarity", 0.0),
             "metadata": metadata,
             "content_type": metadata.get("content_type", "text"),
             "has_visual": bool(metadata.get("has_visual", False)),
             "image_url": metadata.get("image_url")
         }
+        chunk_id = RAGService._coerce_chunk_id(chunk.get("chunk_id"))
+        if chunk_id is not None:
+            source["chunk_id"] = chunk_id
+        if RAGService._is_valid_similarity(chunk.get("similarity")):
+            source["similarity"] = float(chunk["similarity"])
+        return source
+
+    @staticmethod
+    def _manifest_has_chunk_ids(source_manifest: List[Dict[str, Any]]) -> bool:
+        return all(
+            RAGService._coerce_chunk_id(source.get("chunk_id")) is not None
+            for source in source_manifest
+        )
+
+    async def _attach_cached_source_similarities(
+        self,
+        question: str,
+        notebook_id: str,
+        source_manifest: List[Dict[str, Any]],
+        sources: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Attach fresh embedding similarity scores to manifest-backed cached citations."""
+        import asyncio
+
+        cited_keys: list[tuple[str, int]] = []
+        cited_docs: set[str] = set()
+        chunk_counts_by_doc: dict[str, int] = {}
+
+        for manifest_source in source_manifest:
+            document = str(manifest_source.get("document") or "")
+            chunk_id = self._coerce_chunk_id(manifest_source.get("chunk_id"))
+            if document and chunk_id is not None:
+                chunk_counts_by_doc[document] = chunk_counts_by_doc.get(document, 0) + 1
+
+        for source in sources:
+            document = str(source.get("document") or "")
+            chunk_id = self._coerce_chunk_id(source.get("chunk_id"))
+            if not document or chunk_id is None:
+                raise ValueError("Cached citation source is missing document or chunk_id.")
+            cited_keys.append((document, chunk_id))
+            cited_docs.add(document)
+
+        query_embedding = await asyncio.to_thread(
+            self.retrieval_service.embedding_service.embed_text,
+            question
+        )
+        if not query_embedding:
+            raise ValueError("Could not generate query embedding for cached relevance scoring.")
+
+        scores_by_key: dict[tuple[str, int], float] = {}
+        for document in sorted(cited_docs):
+            limit = chunk_counts_by_doc.get(document, 0)
+            if limit <= 0:
+                raise ValueError(f"Cached manifest has no chunk count for document '{document}'.")
+
+            results = await asyncio.to_thread(
+                self.retrieval_service.doc_repo.search_similar,
+                query_embedding=query_embedding,
+                notebook_id=notebook_id,
+                limit=limit,
+                document_name=document
+            )
+            for result in results:
+                result_document = str(result.get("document_name") or document)
+                result_chunk_id = self._coerce_chunk_id(result.get("chunk_id"))
+                similarity = result.get("similarity")
+                if result_chunk_id is not None and self._is_valid_similarity(similarity):
+                    scores_by_key[(result_document, result_chunk_id)] = float(similarity)
+
+        scored_sources: List[Dict[str, Any]] = []
+        for source, key in zip(sources, cited_keys):
+            if key not in scores_by_key:
+                raise ValueError(f"Could not resolve cached relevance score for {key[0]} chunk {key[1]}.")
+            scored_source = dict(source)
+            scored_source["similarity"] = scores_by_key[key]
+            scored_sources.append(scored_source)
+
+        return scored_sources
 
     @staticmethod
     def _resolve_manifest_citations(
@@ -267,6 +363,12 @@ class RAGService:
                 print(f"[CACHE] Cache manifest missing for {cache_key}; recreating cache")
                 self.cache_service.delete_cache(cache_key)
                 cache_name = None
+            elif cache_name and source_manifest and not self._manifest_has_chunk_ids(source_manifest):
+                print(f"[CACHE] Cache manifest missing chunk ids for {cache_key}; recreating cache")
+                self.cache_service.delete_cache(cache_key)
+                self.cache_service.delete_cache_manifest(manifest_key)
+                cache_name = None
+                source_manifest = None
 
             # If cache doesn't exist, create it
             if not cache_name:
@@ -293,6 +395,14 @@ class RAGService:
                 )
                 source_manifest = self.cache_service.get_cache_manifest(manifest_key)
                 print(f"[CACHE] Cache created in {time.time() - start:.2f}s")
+                if cache_name and (
+                    not source_manifest or not self._manifest_has_chunk_ids(source_manifest)
+                ):
+                    print(f"[CACHE] Cache manifest still missing chunk ids for {cache_key}; skipping cache path")
+                    self.cache_service.delete_cache(cache_key)
+                    self.cache_service.delete_cache_manifest(manifest_key)
+                    cache_name = None
+                    source_manifest = None
 
             # Use cached generation if cache exists
             if cache_name and source_manifest:
@@ -313,6 +423,12 @@ class RAGService:
                         raise ValueError("Cached answer did not produce resolvable source citations.")
 
                     answer, sources = resolved
+                    sources = await self._attach_cached_source_similarities(
+                        question,
+                        notebook_id,
+                        source_manifest,
+                        sources
+                    )
 
                     # Stream the validated cached answer after citation resolution.
                     for token in re.split(r"(\s+)", answer):

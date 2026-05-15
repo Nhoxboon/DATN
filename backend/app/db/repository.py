@@ -215,7 +215,7 @@ class SupabaseDocumentRepository:
             offset = 0
             while True:
                 result = self.client.table("documents")\
-                    .select("content, page_range, pages, document_name, metadata")\
+                    .select("chunk_id, content, page_range, pages, document_name, metadata")\
                     .eq("notebook_id", notebook_id)\
                     .eq("document_name", doc_name)\
                     .range(offset, offset + page_size - 1)\

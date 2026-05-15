@@ -4,6 +4,7 @@ import { useState } from 'react'
 interface ChatComposerProps {
   disabled?: boolean
   helperText?: string
+  disclaimerText?: string
   placeholder?: string
   onSubmit: (value: string) => void
 }
@@ -11,6 +12,7 @@ interface ChatComposerProps {
 export function ChatComposer({
   disabled = false,
   helperText = 'Sources cited automatically',
+  disclaimerText,
   placeholder = 'Ask a question about your sources...',
   onSubmit,
 }: ChatComposerProps) {
@@ -53,8 +55,13 @@ export function ChatComposer({
           <Send className="h-4.5 w-4.5" />
         </button>
       </div>
-      <div className="flex flex-wrap items-center justify-center gap-4 px-2 pt-3 text-[0.66rem] text-muted">
+         <div className="flex flex-col items-center gap-1 px-2 pt-3 text-center text-[0.66rem] text-muted">
         <span>{helperText}</span>
+        {disclaimerText && (
+          <span className="text-xs font-medium">
+            {disclaimerText}
+          </span>
+        )}
       </div>
     </div>
   )

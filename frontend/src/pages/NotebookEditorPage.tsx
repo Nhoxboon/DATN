@@ -6,7 +6,7 @@ import { SourceRail } from '../components/sources/SourceRail'
 import { AddSourcesModal } from '../components/sources/AddSourcesModal'
 import { SynthesisCard } from '../components/chat/SynthesisCard'
 import { ChatComposer } from '../components/chat/ChatComposer'
-import { ChatMessageList } from '../components/chat/ChatMessageList'
+import { ChatMessageList, RichAnswerContent } from '../components/chat/ChatMessageList'
 import { StudioDocumentsPanel } from '../components/history/StudioDocumentsPanel'
 import { useChatManager } from '../hooks/useChatManager'
 import { useDocuments } from '../hooks/useDocuments'
@@ -369,6 +369,7 @@ export function NotebookEditorPage() {
                   ? `${selectedSourceNames.length} selected source${selectedSourceNames.length > 1 ? 's' : ''}`
                   : 'Select at least one completed source'
               }
+              disclaimerText="The Scholarly Curator may provide inaccurate information; please carefully verify the answers you receive."
               onSubmit={handleSendMessage}
             />
           </section>
@@ -429,7 +430,9 @@ export function NotebookEditorPage() {
               {activeNote.answer && (
                 <section>
                   <h3 className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">Answer</h3>
-                  <p className="whitespace-pre-wrap text-[0.92rem] leading-7 text-ink">{activeNote.answer}</p>
+                  <div className="text-[0.92rem] leading-7 text-ink">
+                    <RichAnswerContent content={activeNote.answer} sources={activeNote.sources} />
+                  </div>
                 </section>
               )}
               {Boolean(activeNote.sources?.length) && (
