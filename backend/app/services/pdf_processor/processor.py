@@ -17,6 +17,12 @@ from app.core.config import AppConfig, Settings
 class PDFProcessor:
     """Process PDF documents using marker with LLM hybrid mode."""
 
+    VISUAL_CAPTION_COMPLETE_MARKER = "[VISUAL_DESCRIPTION_COMPLETE]"
+    VISUAL_CAPTION_MAX_ATTEMPTS = 3
+    INCOMPLETE_CAPTION_TRAILING_PATTERN = re.compile(
+        r"(?:[,;:]|\b(?:and|or|with|of|to|the|a|an|in|on|for|from|between|including))\s*$",
+        re.IGNORECASE,
+    )
     VISUAL_DESCRIPTION_PATTERN = re.compile(
         r"\b(?:image|figure|picture)(?:/figure)?(?:\s+[^:\n]{0,160})?\s+description"
         r"(?:\s+on\s+page\s+\d+)?\s*:",
@@ -310,41 +316,109 @@ class PDFProcessor:
         if self.caption_client is None:
             return ""
 
-        try:
-            image_copy = image.copy()
-            image_copy.thumbnail((1600, 1600))
-            if image_copy.mode != "RGB":
-                image_copy = image_copy.convert("RGB")
+        image_part = self._image_part_for_caption(image)
+        prompt = self._visual_caption_prompt(image_path, page_number)
+        failures: list[str] = []
 
-            image_bytes = io.BytesIO()
-            image_copy.save(image_bytes, format="WEBP")
-            image_part = types.Part.from_bytes(
-                data=image_bytes.getvalue(),
-                mime_type="image/webp"
+        for attempt in range(1, self.VISUAL_CAPTION_MAX_ATTEMPTS + 1):
+            try:
+                response = self.caption_client.models.generate_content(
+                    model=self.image_caption_model,
+                    contents=[image_part, prompt],
+                    config=types.GenerateContentConfig(
+                        temperature=0,
+                        max_output_tokens=4096,
+                    ),
+                )
+                finish_reason = self._response_finish_reason(response)
+                return self._validated_visual_caption_text(
+                    response.text or "",
+                    image_path,
+                    finish_reason,
+                )
+            except Exception as e:
+                failures.append(f"attempt {attempt}: {e}")
+
+        raise RuntimeError(
+            f"Visual caption generation failed quality checks for {Path(image_path).name}: "
+            + " | ".join(failures)
+        )
+
+    def _image_part_for_caption(self, image: Any) -> types.Part:
+        """Prepare a rendered image for Gemini vision input."""
+        image_copy = image.copy()
+        image_copy.thumbnail((1600, 1600))
+        if image_copy.mode != "RGB":
+            image_copy = image_copy.convert("RGB")
+
+        image_bytes = io.BytesIO()
+        image_copy.save(image_bytes, format="WEBP")
+        return types.Part.from_bytes(
+            data=image_bytes.getvalue(),
+            mime_type="image/webp"
+        )
+
+    def _visual_caption_prompt(self, image_path: str, page_number: int | None) -> str:
+        """Build the prompt used for visual descriptions."""
+        page_hint = f" on page {page_number}" if page_number is not None else ""
+        return (
+            "Create a faithful, searchable description of this document visual"
+            f"{page_hint}. If it contains readable text, transcribe the important text. "
+            "If it is a diagram, describe the nodes/states, arrows/transitions, and overall flow. "
+            "If it is a chart or table-like visual, include labels, numbers, axes, and relationships. "
+            "Return a complete plain-Markdown description in about 300-700 words. "
+            "Use no more than 12 bullets, summarize minor repeated transitions, and do not stop mid-list. "
+            f"End the response with exactly this marker on its own final line: {self.VISUAL_CAPTION_COMPLETE_MARKER}\n"
+            f"Source image filename: {Path(image_path).name}."
+        )
+
+    def _response_finish_reason(self, response: Any) -> str:
+        """Return a readable Gemini finish reason for diagnostics."""
+        candidates = getattr(response, "candidates", None) or []
+        if not candidates:
+            return "unknown"
+
+        reason = getattr(candidates[0], "finish_reason", None)
+        if reason is None:
+            return "unknown"
+
+        return str(getattr(reason, "name", reason))
+
+    def _validated_visual_caption_text(
+        self,
+        text: str,
+        image_path: str,
+        finish_reason: str = "unknown",
+    ) -> str:
+        """Strip the completion marker and reject obviously incomplete captions."""
+        raw_text = text.strip()
+        if not raw_text:
+            raise ValueError(f"empty caption response (finish_reason={finish_reason})")
+
+        if not raw_text.endswith(self.VISUAL_CAPTION_COMPLETE_MARKER):
+            tail = self._single_line_tail(raw_text)
+            raise ValueError(
+                f"incomplete caption for {Path(image_path).name}; missing completion marker "
+                f"(finish_reason={finish_reason}, tail={tail!r})"
             )
 
-            page_hint = f" on page {page_number}" if page_number is not None else ""
-            prompt = (
-                "Create a faithful, searchable description of this document visual"
-                f"{page_hint}. If it contains readable text, transcribe the important text. "
-                "If it is a diagram, describe the nodes/states, arrows/transitions, and overall flow. "
-                "If it is a chart or table-like visual, include labels, numbers, axes, and relationships. "
-                f"Source image filename: {Path(image_path).name}."
+        caption = raw_text[: -len(self.VISUAL_CAPTION_COMPLETE_MARKER)].rstrip()
+        if self._looks_like_incomplete_caption(caption):
+            tail = self._single_line_tail(caption)
+            raise ValueError(
+                f"incomplete caption for {Path(image_path).name}; dangling ending "
+                f"(finish_reason={finish_reason}, tail={tail!r})"
             )
 
-            response = self.caption_client.models.generate_content(
-                model=self.image_caption_model,
-                contents=[image_part, prompt],
-                config=types.GenerateContentConfig(
-                    temperature=0,
-                    max_output_tokens=1200,
-                ),
-            )
+        return caption
 
-            return (response.text or "").strip()
-        except Exception as e:
-            print(f"Warning: Could not describe image placeholder '{image_path}': {e}")
-            return ""
+    def _looks_like_incomplete_caption(self, text: str) -> bool:
+        """Detect common Gemini truncation endings before storing the caption."""
+        return bool(self.INCOMPLETE_CAPTION_TRAILING_PATTERN.search(text.strip()))
+
+    def _single_line_tail(self, text: str, length: int = 120) -> str:
+        """Return a compact tail snippet for error messages."""
+        return " ".join(text.split())[-length:]
 
     def _visual_caption_failure_text(
         self,

@@ -12,7 +12,13 @@ from uuid import uuid4
 from celery import Celery
 
 from app.core.config import get_settings
-from app.core.document_naming import document_name_from_filename, normalize_document_name, safe_pdf_storage_path
+from app.core.document_naming import (
+    document_extension_from_filename,
+    document_name_from_filename,
+    normalize_document_name,
+    safe_document_storage_path,
+    safe_pdf_storage_path,
+)
 from app.db.processing_status import ProcessingStatus, get_processing_status_repository
 from app.db.repository import get_document_repository
 from app.services.rag.cache_registry import invalidate_document_caches
@@ -141,6 +147,7 @@ class NotebookWorkspaceService:
     ) -> dict[str, Any]:
         notebook = self._require_notebook(user_id, notebook_id)
         document_name = document_name_from_filename(filename)
+        source_extension = document_extension_from_filename(filename)
         status_repo = get_processing_status_repository(self.client)
         status_created = False
 
@@ -157,7 +164,7 @@ class NotebookWorkspaceService:
             task_id = str(uuid4())
             upload_dir = Path(settings.uploads_dir) / user_id / notebook_id
             upload_dir.mkdir(parents=True, exist_ok=True)
-            file_path = upload_dir / safe_pdf_storage_path(document_name)
+            file_path = upload_dir / safe_document_storage_path(document_name, source_extension)
             file_path.write_bytes(file_content)
             logger.info(
                 "Queued notebook document upload notebook_id=%s user_id=%s document=%s task_id=%s path=%s bytes=%s",
@@ -675,8 +682,10 @@ class NotebookWorkspaceService:
 
     def _clean_document_title(self, value: str) -> str:
         clean_value = normalize_document_name(value)
-        if clean_value.lower().endswith(".pdf"):
-            clean_value = normalize_document_name(clean_value[:-4])
+        for extension in (".pdf", ".docx"):
+            if clean_value.lower().endswith(extension):
+                clean_value = normalize_document_name(clean_value[: -len(extension)])
+                break
         return clean_value
 
     def _storage_paths_for_document(self, user_id: str, notebook_id: str, document_name: str) -> list[str]:
@@ -792,11 +801,13 @@ class NotebookWorkspaceService:
     def _delete_local_upload(self, user_id: str, notebook_id: str, document_name: str) -> None:
         try:
             settings = get_settings()
-            file_path = Path(settings.uploads_dir) / user_id / notebook_id / safe_pdf_storage_path(document_name)
-            if file_path.exists():
-                file_path.unlink()
+            upload_dir = Path(settings.uploads_dir) / user_id / notebook_id
+            for extension in (".pdf", ".docx"):
+                file_path = upload_dir / safe_document_storage_path(document_name, extension)
+                if file_path.exists():
+                    file_path.unlink()
         except Exception:
-            logger.info("Could not remove local uploaded PDF.", exc_info=True)
+            logger.info("Could not remove local uploaded document.", exc_info=True)
 
     def _rename_local_upload(
         self,
@@ -808,12 +819,13 @@ class NotebookWorkspaceService:
         try:
             settings = get_settings()
             upload_dir = Path(settings.uploads_dir) / user_id / notebook_id
-            current_path = upload_dir / safe_pdf_storage_path(current_name)
-            next_path = upload_dir / safe_pdf_storage_path(next_name)
-            if current_path.exists() and not next_path.exists():
-                current_path.rename(next_path)
+            for extension in (".pdf", ".docx"):
+                current_path = upload_dir / safe_document_storage_path(current_name, extension)
+                next_path = upload_dir / safe_document_storage_path(next_name, extension)
+                if current_path.exists() and not next_path.exists():
+                    current_path.rename(next_path)
         except Exception:
-            logger.info("Could not rename local uploaded PDF.", exc_info=True)
+            logger.info("Could not rename local uploaded document.", exc_info=True)
 
     def _summary(self, row: dict[str, Any], source_count: int) -> NotebookSummary:
         return NotebookSummary(

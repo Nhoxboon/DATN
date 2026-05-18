@@ -14,6 +14,11 @@ function sizeLabel(file: File) {
   return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`
 }
 
+function isSupportedDocument(file: File) {
+  const name = file.name.toLowerCase()
+  return name.endsWith('.pdf') || name.endsWith('.docx')
+}
+
 export function AddSourcesModal({ open, onClose, onProcess }: AddSourcesModalProps) {
   const portalTarget = usePortal()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -29,12 +34,12 @@ export function AddSourcesModal({ open, onClose, onProcess }: AddSourcesModalPro
       return
     }
 
-    const pdfs = Array.from(nextFiles).filter((file) => file.name.toLowerCase().endsWith('.pdf'))
+    const documents = Array.from(nextFiles).filter(isSupportedDocument)
     setFiles((current) => {
       const existing = new Set(current.map((file) => `${file.name}:${file.size}`))
-      return [...current, ...pdfs.filter((file) => !existing.has(`${file.name}:${file.size}`))]
+      return [...current, ...documents.filter((file) => !existing.has(`${file.name}:${file.size}`))]
     })
-    setError(pdfs.length === nextFiles.length ? null : 'Only PDF files are supported.')
+    setError(documents.length === nextFiles.length ? null : 'Only PDF and DOCX files are supported.')
   }
 
   const removeFile = (file: File) => {
@@ -56,7 +61,7 @@ export function AddSourcesModal({ open, onClose, onProcess }: AddSourcesModalPro
             <div>
               <h2 className="text-[1.55rem] font-medium text-ink">Add Sources</h2>
               <p className="mt-1 text-[0.76rem] text-muted">
-                Upload PDF files to this notebook.
+                Upload PDF or Word documents to this notebook.
               </p>
             </div>
             <button
@@ -73,7 +78,7 @@ export function AddSourcesModal({ open, onClose, onProcess }: AddSourcesModalPro
           <input
             ref={fileInputRef}
             type="file"
-            accept="application/pdf,.pdf"
+            accept="application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,.docx"
             multiple
             className="hidden"
             onChange={(event) => {
@@ -89,7 +94,7 @@ export function AddSourcesModal({ open, onClose, onProcess }: AddSourcesModalPro
             <div className="mx-auto mb-4 flex h-11 w-11 items-center justify-center rounded-[10px] bg-[rgba(0,91,192,0.12)] text-primary">
               <Upload className="h-4.5 w-4.5" />
             </div>
-            <h3 className="text-[0.96rem] font-medium text-ink">Choose PDF files</h3>
+            <h3 className="text-[0.96rem] font-medium text-ink">Choose documents</h3>
             <p className="mt-1 text-[0.66rem] text-muted">Max 50MB per file</p>
           </button>
 

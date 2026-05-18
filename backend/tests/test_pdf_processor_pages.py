@@ -43,6 +43,41 @@ class PDFProcessorPageTests(unittest.TestCase):
 
         self.assertEqual(boundaries, [(0, 1)])
 
+    def test_visual_caption_validator_strips_completion_marker(self) -> None:
+        text = (
+            "A complete diagram description with states and transitions.\n"
+            f"{PDFProcessor.VISUAL_CAPTION_COMPLETE_MARKER}"
+        )
+
+        caption = self.processor._validated_visual_caption_text(
+            text,
+            "_page_0_Figure_0.jpeg",
+            "STOP",
+        )
+
+        self.assertEqual(caption, "A complete diagram description with states and transitions.")
+
+    def test_visual_caption_validator_rejects_missing_completion_marker(self) -> None:
+        with self.assertRaisesRegex(ValueError, "missing completion marker"):
+            self.processor._validated_visual_caption_text(
+                "Figure description on page 1: This diagram is organized into Ability, Grounded, and",
+                "_page_0_Figure_0.jpeg",
+                "STOP",
+            )
+
+    def test_visual_caption_validator_rejects_dangling_ending(self) -> None:
+        text = (
+            "Figure description on page 1: This diagram is organized into Ability, Grounded, and\n"
+            f"{PDFProcessor.VISUAL_CAPTION_COMPLETE_MARKER}"
+        )
+
+        with self.assertRaisesRegex(ValueError, "dangling ending"):
+            self.processor._validated_visual_caption_text(
+                text,
+                "_page_0_Figure_0.jpeg",
+                "STOP",
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

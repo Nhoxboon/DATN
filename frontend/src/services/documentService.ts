@@ -30,7 +30,7 @@ function updatedLabel(value: string | null | undefined) {
 function statusMeta(document: BackendDocumentStatus) {
   if (document.status === 'completed') {
     const chunks = document.total_chunks ?? document.processed_chunks
-    return chunks ? `PDF Document - ${chunks} chunks indexed` : 'PDF Document - Indexed'
+    return chunks ? `Document - ${chunks} chunks indexed` : 'Document - Indexed'
   }
 
   if (document.status === 'failed') {
@@ -91,7 +91,7 @@ function toDetail(detail: BackendNotebookDetail): NotebookDetail {
     synthesisTitle: completedCount ? 'Notebook Context Ready' : 'Add Sources',
     synthesisBody: completedCount
       ? 'Ask a question about the selected sources. The answer will cite the documents that are checked in the source rail.'
-      : 'Upload PDF sources to this notebook, then select the documents you want the assistant to scan.',
+      : 'Upload PDF or Word sources to this notebook, then select the documents you want the assistant to scan.',
     synthesisBullets: completedCount
       ? [
           'Checked sources define the retrieval scope for each answer.',
@@ -99,7 +99,7 @@ function toDetail(detail: BackendNotebookDetail): NotebookDetail {
           'Use "Save to note" to preserve important answers in Studio.',
         ]
       : [
-          'Upload one or more PDF files.',
+          'Upload one or more PDF or Word documents.',
           'Wait until indexing is completed.',
           'Select completed sources before asking a question.',
         ],
