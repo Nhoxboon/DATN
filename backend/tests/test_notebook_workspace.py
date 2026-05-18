@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 import unittest
@@ -282,6 +283,35 @@ class NotebookWorkspaceTests(unittest.TestCase):
         self.assertEqual(len(statuses), 1)
         self.assertNotEqual(statuses[0]["task_id"], "sync-upload")
         fake_celery.send_task.assert_called_once()
+
+    def test_upload_docx_preserves_source_extension_before_queueing(self) -> None:
+        fake_celery = SimpleNamespace(send_task=Mock())
+
+        with TemporaryDirectory() as uploads_dir:
+            with patch(
+                "app.services.notebooks.get_settings",
+                return_value=SimpleNamespace(
+                    document_processing_mode="worker",
+                    uploads_dir=uploads_dir,
+                    redis_url="redis://test",
+                ),
+            ), patch.object(self.service, "_celery_app", return_value=fake_celery):
+                result = self.service.upload_document(
+                    "user-1",
+                    "notebook-1",
+                    b"docx-bytes",
+                    "State Machine Diagram.docx",
+                )
+
+        queued_path = Path(fake_celery.send_task.call_args.kwargs["args"][3])
+        self.assertTrue(result["storage_path"].endswith(".docx"))
+        self.assertEqual(queued_path.suffix, ".docx")
+
+    def test_upload_rejects_unsupported_document_extensions(self) -> None:
+        for filename in ("Notes.txt", "Legacy Document.doc"):
+            with self.subTest(filename=filename):
+                with self.assertRaises(ValueError):
+                    self.service.upload_document("user-1", "notebook-1", b"content", filename)
 
     def test_upload_invalidates_normalized_document_cache_before_queueing(self) -> None:
         fake_celery = SimpleNamespace(send_task=Mock())

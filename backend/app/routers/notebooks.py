@@ -141,7 +141,7 @@ async def upload_document(
     current_user: CurrentUser = Depends(get_current_user),
     service: NotebookWorkspaceService = Depends(get_workspace_service),
 ) -> DocumentUploadResponse:
-    """Upload and queue a PDF for worker indexing into a notebook."""
+    """Upload and queue a PDF or DOCX for worker indexing into a notebook."""
     if not file.filename:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Filename is required.")
 

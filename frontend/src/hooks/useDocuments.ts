@@ -230,8 +230,8 @@ export function useDocuments(notebookId?: string) {
 
     const optimisticSources: SourceItem[] = files.map((file) => ({
       id: `uploading-${file.name}-${file.size}-${file.lastModified}`,
-      name: file.name.replace(/\.pdf$/i, ''),
-      kind: 'pdf',
+      name: file.name.replace(/\.(pdf|docx)$/i, ''),
+      kind: file.name.toLowerCase().endsWith('.docx') ? 'docx' : 'pdf',
       meta: 'Indexing - queued',
       selected: false,
       status: 'pending',
