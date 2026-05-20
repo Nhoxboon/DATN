@@ -33,6 +33,7 @@ from app.schemas.notebooks import (
 
 logger = logging.getLogger(__name__)
 CITATION_PATTERN = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
+STORAGE_REMOVE_BATCH_SIZE = 1000
 
 
 class NotebookNotFoundError(ValueError):
@@ -117,6 +118,9 @@ class NotebookWorkspaceService:
 
     def delete_notebook(self, user_id: str, notebook_id: str) -> None:
         self._require_notebook(user_id, notebook_id)
+        source_storage_paths = self._storage_paths_for_notebook(user_id, notebook_id)
+        audio_storage_paths = self._audio_storage_paths_for_notebook(user_id, notebook_id)
+        self._revoke_notebook_tasks(user_id, notebook_id)
         (
             self.client.table("notebooks")
             .delete()
@@ -124,6 +128,8 @@ class NotebookWorkspaceService:
             .eq("user_id", user_id)
             .execute()
         )
+        self._delete_storage_paths(source_storage_paths)
+        self._delete_audio_storage_paths(audio_storage_paths)
 
     def list_documents(self, user_id: str, notebook_id: str) -> list[DocumentStatus]:
         self._require_notebook(user_id, notebook_id)
@@ -688,11 +694,14 @@ class NotebookWorkspaceService:
                 break
         return clean_value
 
-    def _storage_paths_for_document(self, user_id: str, notebook_id: str, document_name: str) -> list[str]:
-        paths = [
+    def _default_storage_paths_for_document(self, user_id: str, notebook_id: str, document_name: str) -> list[str]:
+        return [
             f"{user_id}/{notebook_id}/{safe_pdf_storage_path(document_name)}",
             f"{user_id}/{notebook_id}/{document_name}.pdf",
         ]
+
+    def _storage_paths_for_document(self, user_id: str, notebook_id: str, document_name: str) -> list[str]:
+        paths = self._default_storage_paths_for_document(user_id, notebook_id, document_name)
         result = (
             self.client.table("documents")
             .select("metadata")
@@ -707,26 +716,125 @@ class NotebookWorkspaceService:
                 paths.append(metadata["storage_path"])
         return list(dict.fromkeys(paths))
 
+    def _storage_paths_for_notebook(self, user_id: str, notebook_id: str) -> list[str]:
+        paths: list[str] = []
+        statuses = (
+            self.client.table("document_processing_status")
+            .select("document_name")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        for row in (statuses.data if isinstance(statuses.data, list) else []):
+            document_name = row.get("document_name") if isinstance(row, dict) else None
+            if isinstance(document_name, str) and document_name:
+                paths.extend(self._default_storage_paths_for_document(user_id, notebook_id, document_name))
+
+        documents = (
+            self.client.table("documents")
+            .select("document_name,metadata")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        for row in (documents.data if isinstance(documents.data, list) else []):
+            if not isinstance(row, dict):
+                continue
+
+            document_name = row.get("document_name")
+            if isinstance(document_name, str) and document_name:
+                paths.extend(self._default_storage_paths_for_document(user_id, notebook_id, document_name))
+
+            metadata = row.get("metadata")
+            if isinstance(metadata, dict) and isinstance(metadata.get("storage_path"), str):
+                paths.append(metadata["storage_path"])
+
+        return list(dict.fromkeys(paths))
+
     def _delete_storage_paths(self, storage_paths: list[str]) -> None:
+        self._remove_storage_paths("pdfs", storage_paths, "source PDFs")
+
+    def _audio_storage_paths_for_notebook(self, user_id: str, notebook_id: str) -> list[str]:
+        result = (
+            self.client.table("audio_overviews")
+            .select("id,status,storage_path,metadata")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        paths: list[str] = []
+        for row in (result.data if isinstance(result.data, list) else []):
+            if not isinstance(row, dict):
+                continue
+
+            storage_path = row.get("storage_path")
+            if isinstance(storage_path, str) and storage_path:
+                paths.append(storage_path)
+                continue
+
+            overview_id = row.get("id")
+            if row.get("status") == "completed" and overview_id:
+                paths.append(f"{user_id}/{notebook_id}/{overview_id}.m4a")
+
+        return list(dict.fromkeys(paths))
+
+    def _delete_audio_storage_paths(self, storage_paths: list[str]) -> None:
+        if not storage_paths:
+            return
+
+        self._remove_storage_paths(get_settings().audio_overview_bucket, storage_paths, "audio overviews")
+
+    def _remove_storage_paths(self, bucket_name: str, storage_paths: list[str], label: str) -> None:
         storage = getattr(self.client, "storage", None)
         if not storage or not storage_paths:
             return
 
-        try:
-            storage.from_("pdfs").remove(storage_paths)
-        except Exception:
-            logger.info("Could not remove one or more source PDFs from storage.", exc_info=True)
+        unique_paths = list(dict.fromkeys(storage_paths))
+        for index in range(0, len(unique_paths), STORAGE_REMOVE_BATCH_SIZE):
+            batch = unique_paths[index : index + STORAGE_REMOVE_BATCH_SIZE]
+            try:
+                storage.from_(bucket_name).remove(batch)
+            except Exception:
+                logger.info("Could not remove one or more %s from storage.", label, exc_info=True)
+
+    def _revoke_notebook_tasks(self, user_id: str, notebook_id: str) -> None:
+        statuses = (
+            self.client.table("document_processing_status")
+            .select("task_id")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        for source in (statuses.data if isinstance(statuses.data, list) else []):
+            if isinstance(source, dict):
+                self._revoke_processing_task(source)
+
+        audio_overviews = (
+            self.client.table("audio_overviews")
+            .select("metadata")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        for overview in (audio_overviews.data if isinstance(audio_overviews.data, list) else []):
+            metadata = overview.get("metadata") if isinstance(overview, dict) else None
+            task_id = metadata.get("task_id") if isinstance(metadata, dict) else None
+            if isinstance(task_id, str) and task_id:
+                self._revoke_task(task_id, "audio overview")
 
     def _revoke_processing_task(self, source: dict[str, Any]) -> None:
         task_id = str(source.get("task_id") or "").strip()
         if not task_id:
             return
 
+        self._revoke_task(task_id, "document processing")
+
+    def _revoke_task(self, task_id: str, label: str) -> None:
         try:
             settings = get_settings()
             self._celery_app(settings.redis_url).control.revoke(task_id, terminate=True)
         except Exception:
-            logger.info("Could not revoke document processing task task_id=%s.", task_id, exc_info=True)
+            logger.info("Could not revoke %s task task_id=%s.", label, task_id, exc_info=True)
 
     def _celery_app(self, redis_url: str) -> Celery:
         return Celery("datn_backend_control", broker=redis_url, backend=redis_url)
@@ -780,6 +888,36 @@ class NotebookWorkspaceService:
                 renamed_sources, sources_changed = self._rename_sources(sources, current_name, next_name)
                 if sources_changed:
                     self.client.table("chat_messages").update({"sources": renamed_sources}).eq("id", message["id"]).execute()
+
+        audio_overviews = (
+            self.client.table("audio_overviews")
+            .select("id,metadata")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        for overview in (audio_overviews.data if isinstance(audio_overviews.data, list) else []):
+            metadata = overview.get("metadata") if isinstance(overview, dict) else None
+            if not isinstance(metadata, dict):
+                continue
+            overview_id = overview.get("id")
+            if not overview_id:
+                continue
+
+            document_names = metadata.get("document_names")
+            if not isinstance(document_names, list):
+                continue
+
+            renamed_names = [next_name if name == current_name else name for name in document_names]
+            if renamed_names == document_names:
+                continue
+
+            self.client.table("audio_overviews").update(
+                {
+                    "metadata": {**metadata, "document_names": renamed_names},
+                    "updated_at": _utc_now(),
+                }
+            ).eq("id", overview_id).execute()
 
     def _rename_sources(self, sources: Any, current_name: str, next_name: str) -> tuple[list[Any], bool]:
         if not isinstance(sources, list):

@@ -92,37 +92,48 @@ export function StudioDocumentsPanel({
               className="group relative rounded-[18px] border border-black/5 bg-white shadow-[0_8px_22px_rgba(43,52,55,0.05)] transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(43,52,55,0.08)]"
             >
               {isAudio ? (
-                <div className="px-4 py-4 pr-10">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-surface-low text-primary">
-                      {isAudioProcessing ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Icon className="h-4 w-4" />
-                      )}
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOpenMenuId(null)
+                      onOpenDocument?.(document)
+                    }}
+                    className="block w-full px-4 py-4 pr-10 text-left"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-surface-low text-primary">
+                        {isAudioProcessing ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Icon className="h-4 w-4" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-[0.82rem] font-medium leading-5 text-ink">{document.title}</h3>
+                        <p className="mt-1 text-[0.66rem] uppercase tracking-[0.1em] text-muted">
+                          {audioDocument ? audioOverviewService.styleLabel(audioDocument.style) : 'Audio overview'}
+                        </p>
+                        <p className="mt-1.5 text-[0.68rem] leading-5 text-muted">{document.excerpt}</p>
+                        {audioDocument?.status === 'failed' && (
+                          <div className="mt-2 text-[0.66rem] font-medium text-red-600">
+                            Failed
+                          </div>
+                        )}
+                        <p className="mt-2.5 text-[0.66rem] text-muted">{document.updatedAt}</p>
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-[0.82rem] font-medium leading-5 text-ink">{document.title}</h3>
-                      <p className="mt-1 text-[0.66rem] uppercase tracking-[0.1em] text-muted">
-                        {audioDocument ? audioOverviewService.styleLabel(audioDocument.style) : 'Audio overview'}
-                      </p>
-                      <p className="mt-1.5 text-[0.68rem] leading-5 text-muted">{document.excerpt}</p>
-                      {audioDocument?.status === 'completed' && audioDocument.audioUrl && (
-                        <audio
-                          controls
-                          src={audioDocument.audioUrl}
-                          className="mt-3 h-8 w-full"
-                        />
-                      )}
-                      {audioDocument?.status === 'failed' && (
-                        <div className="mt-2 text-[0.66rem] font-medium text-red-600">
-                          Failed
-                        </div>
-                      )}
-                      <p className="mt-2.5 text-[0.66rem] text-muted">{document.updatedAt}</p>
+                  </button>
+                  {audioDocument?.status === 'completed' && audioDocument.audioUrl && (
+                    <div className="-mt-1 px-4 pb-4 pl-[3.25rem] pr-10">
+                      <audio
+                        controls
+                        src={audioDocument.audioUrl}
+                        className="h-8 w-full"
+                      />
                     </div>
-                  </div>
-                </div>
+                  )}
+                </>
               ) : (
                 <button
                   type="button"

@@ -10,6 +10,7 @@ import unittest
 from unittest.mock import Mock, call, patch
 from uuid import uuid4
 
+from app.core.document_naming import safe_pdf_storage_path
 from app.db.processing_status import ProcessingStatus
 from app.services.notebooks import (
     NotebookNotFoundError,
@@ -121,6 +122,25 @@ class FakeQuery:
         return rows
 
 
+class FakeStorageBucket:
+    def __init__(self) -> None:
+        self.removed: list[str] = []
+
+    def remove(self, paths: list[str]) -> list[dict[str, object]]:
+        self.removed.extend(paths)
+        return []
+
+
+class FakeStorage:
+    def __init__(self) -> None:
+        self.buckets: dict[str, FakeStorageBucket] = {}
+
+    def from_(self, bucket_name: str) -> FakeStorageBucket:
+        if bucket_name not in self.buckets:
+            self.buckets[bucket_name] = FakeStorageBucket()
+        return self.buckets[bucket_name]
+
+
 class FakeSupabaseClient:
     def __init__(self):
         self.tables: dict[str, list[dict[str, object]]] = {
@@ -130,7 +150,9 @@ class FakeSupabaseClient:
             "chat_sessions": [],
             "chat_messages": [],
             "notebook_notes": [],
+            "audio_overviews": [],
         }
+        self.storage = FakeStorage()
 
     def table(self, table_name: str) -> FakeQuery:
         return FakeQuery(self, table_name)
@@ -150,6 +172,21 @@ class FakeSupabaseClient:
         if table_name == "chat_sessions":
             self.tables["chat_messages"] = [
                 row for row in self.tables["chat_messages"] if row.get("session_id") not in ids
+            ]
+        elif table_name == "notebooks":
+            for related_table in (
+                "documents",
+                "document_processing_status",
+                "chat_sessions",
+                "notebook_notes",
+                "audio_overviews",
+            ):
+                self.tables[related_table] = [
+                    row for row in self.tables[related_table] if row.get("notebook_id") not in ids
+                ]
+            session_ids = {row.get("id") for row in self.tables["chat_sessions"]}
+            self.tables["chat_messages"] = [
+                row for row in self.tables["chat_messages"] if row.get("session_id") in session_ids
             ]
 
 
@@ -439,14 +476,27 @@ class NotebookWorkspaceTests(unittest.TestCase):
         )
         session_id, _ = self.service.get_current_chat("user-1", "notebook-1")
         self.service._insert_message(session_id, "assistant", "Answer", [{"document": "Old source"}])
+        self.client.insert_row(
+            "audio_overviews",
+            {
+                "notebook_id": "notebook-1",
+                "user_id": "user-1",
+                "status": "completed",
+                "storage_path": "user-1/notebook-1/audio.m4a",
+                "metadata": {"document_names": ["Old source", "Other source"], "title": "Audio Overview"},
+            },
+        )
 
         self.service.rename_document("user-1", "notebook-1", "Old source", "New source")
 
         note = self.service.list_notes("user-1", "notebook-1")[0]
         messages = self.service._messages(session_id)
+        audio_metadata = self.client.tables["audio_overviews"][0]["metadata"]
+        assert isinstance(audio_metadata, dict)
         self.assertEqual(note.document_names, ["New source"])
         self.assertEqual(note.sources[0]["document"], "New source")
         self.assertEqual(messages[0].sources[0]["document"], "New source")
+        self.assertEqual(audio_metadata["document_names"], ["New source", "Other source"])
 
     def test_rename_document_rejects_duplicate_name(self) -> None:
         self.add_document("Existing")
@@ -471,6 +521,57 @@ class NotebookWorkspaceTests(unittest.TestCase):
 
         self.assertEqual(self.client.tables["document_processing_status"], [])
         self.assertEqual(self.client.tables["documents"], [])
+
+    def test_delete_document_removes_source_pdf_storage_objects(self) -> None:
+        self.add_document("Indexed source")
+        self.add_chunk("Indexed source")
+
+        self.service.delete_document("user-1", "notebook-1", "Indexed source")
+
+        removed = self.client.storage.from_("pdfs").removed
+        self.assertEqual(
+            set(removed),
+            {
+                f"user-1/notebook-1/{safe_pdf_storage_path('Indexed source')}",
+                "user-1/notebook-1/Indexed source.pdf",
+            },
+        )
+
+    def test_delete_notebook_removes_source_and_audio_storage_objects(self) -> None:
+        self.add_document("Indexed source")
+        self.add_chunk("Indexed source")
+        self.add_document("Queued source", ProcessingStatus.PENDING)
+        self.client.insert_row(
+            "audio_overviews",
+            {
+                "notebook_id": "notebook-1",
+                "user_id": "user-1",
+                "status": "completed",
+                "storage_path": "user-1/notebook-1/audio.m4a",
+                "metadata": {"task_id": "audio-task"},
+            },
+        )
+        fake_celery = SimpleNamespace(control=SimpleNamespace(revoke=Mock()))
+
+        with patch(
+            "app.services.notebooks.get_settings",
+            return_value=SimpleNamespace(redis_url="redis://test", audio_overview_bucket="audio-overviews"),
+        ), patch.object(self.service, "_celery_app", return_value=fake_celery):
+            self.service.delete_notebook("user-1", "notebook-1")
+
+        removed_pdfs = self.client.storage.from_("pdfs").removed
+        removed_audio = self.client.storage.from_("audio-overviews").removed
+        self.assertEqual(
+            set(removed_pdfs),
+            {
+                f"user-1/notebook-1/{safe_pdf_storage_path('Indexed source')}",
+                "user-1/notebook-1/Indexed source.pdf",
+                f"user-1/notebook-1/{safe_pdf_storage_path('Queued source')}",
+                "user-1/notebook-1/Queued source.pdf",
+            },
+        )
+        self.assertEqual(removed_audio, ["user-1/notebook-1/audio.m4a"])
+        fake_celery.control.revoke.assert_called_once_with("audio-task", terminate=True)
 
     def test_delete_document_invalidates_existing_document_cache_only(self) -> None:
         self.add_document("Indexed source")

@@ -19,7 +19,7 @@ from app.modules.audio_overviews.service import (
     AudioOverviewValidationError,
     AudioOverviewService,
 )
-from app.modules.audio_overviews.tasks import _coerce_audio_bytes, _parse_json_object
+from app.modules.audio_overviews.tasks import _coerce_audio_bytes, _parse_json_object, _require_min_duration
 
 
 def _now() -> str:
@@ -247,6 +247,13 @@ class AudioOverviewTaskHelperTests(unittest.TestCase):
     def test_coerce_audio_bytes_decodes_base64(self) -> None:
         self.assertEqual(_coerce_audio_bytes("YWJj"), b"abc")
         self.assertEqual(_coerce_audio_bytes(b"abc"), b"abc")
+
+    def test_require_min_duration_rejects_short_audio(self) -> None:
+        with self.assertRaisesRegex(ValueError, "shorter than the required minimum"):
+            _require_min_duration(42.5, 150)
+
+    def test_require_min_duration_allows_disabled_minimum(self) -> None:
+        _require_min_duration(0.0, 0)
 
 
 if __name__ == "__main__":

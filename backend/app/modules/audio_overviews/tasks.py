@@ -94,6 +94,8 @@ def generate_audio_overview_task(
                         previous_script=script_payload.get("script_text"),
                     )
 
+            _require_min_duration(duration_seconds, settings.audio_overview_min_duration_seconds)
+
             storage_path = f"{user_id}/{notebook_id}/{overview_id}.m4a"
             _upload_audio(client, settings.audio_overview_bucket, storage_path, m4a_path)
 
@@ -142,6 +144,17 @@ def _build_context(chunks: list[dict[str, Any]]) -> str:
             continue
         parts.append(f"[Source {index}] Document: {document}; pages: {page_range}\n{content}")
     return "\n\n".join(parts)
+
+
+def _require_min_duration(duration_seconds: float, minimum_seconds: int) -> None:
+    if minimum_seconds <= 0:
+        return
+
+    if duration_seconds < minimum_seconds:
+        raise ValueError(
+            "Rendered audio duration "
+            f"{duration_seconds:.1f}s is shorter than the required minimum of {minimum_seconds}s."
+        )
 
 
 def _summarize_context(genai_client: genai.Client, model: str, context: str, document_names: list[str]) -> str:

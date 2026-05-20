@@ -163,6 +163,34 @@ export function useDocuments(notebookId?: string) {
     }
   }, [notebook?.sources, notebook?.studioDocuments, notebookId, refreshNotebook])
 
+  useEffect(() => {
+    const hasCompletedAudio = notebook?.studioDocuments.some(
+      (document) => document.itemType === 'audio_overview' && document.status === 'completed',
+    )
+
+    if (!notebookId || !hasCompletedAudio) {
+      return undefined
+    }
+
+    const refreshAudioUrls = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshNotebook()
+      }
+    }
+
+    const intervalId = window.setInterval(refreshAudioUrls, 55 * 60 * 1000)
+    const handleVisibilityChange = () => {
+      refreshAudioUrls()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [notebook?.studioDocuments, notebookId, refreshNotebook])
+
   const createNotebook = async () => {
     const created = await documentService.createNotebook()
     const refreshedSummaries = await documentService.getNotebookSummaries()
@@ -208,15 +236,11 @@ export function useDocuments(notebookId?: string) {
     }
 
     const renamed = await documentService.renameDocument(notebookId, documentName, nextDocumentName)
-    const refreshedSummaries = await documentService.getNotebookSummaries()
-    setNotebook((current) =>
-      withAudioOverviews(
-        renamed,
-        current?.studioDocuments.filter(
-          (document): document is AudioOverviewDocument => document.itemType === 'audio_overview',
-        ) ?? [],
-      ),
-    )
+    const [refreshedSummaries, audioOverviews] = await Promise.all([
+      documentService.getNotebookSummaries(),
+      audioOverviewService.getAudioOverviews(notebookId),
+    ])
+    setNotebook(withAudioOverviews(renamed, audioOverviews))
     setSummaries(refreshedSummaries)
     return renamed
   }

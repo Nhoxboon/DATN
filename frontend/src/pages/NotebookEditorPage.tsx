@@ -11,7 +11,7 @@ import { StudioDocumentsPanel } from '../components/history/StudioDocumentsPanel
 import { useChatManager } from '../hooks/useChatManager'
 import { useDocuments } from '../hooks/useDocuments'
 import { useAuth } from '../hooks/useAuth'
-import type { AudioOverviewDocument, SourceItem, StudioDocument, StudioNoteDocument } from '../types'
+import type { AudioOverviewDocument, SourceItem, StudioNoteDocument } from '../types'
 
 export function NotebookEditorPage() {
   const { notebookId = '' } = useParams()
@@ -22,7 +22,7 @@ export function NotebookEditorPage() {
   const avatarRef = useRef<HTMLButtonElement | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [deselectedByNotebook, setDeselectedByNotebook] = useState<Record<string, string[]>>({})
-  const [activeItem, setActiveItem] = useState<StudioDocument | null>(null)
+  const [activeItemId, setActiveItemId] = useState<string | null>(null)
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null)
   const [creatingAudio, setCreatingAudio] = useState(false)
   const [noteError, setNoteError] = useState<string | null>(null)
@@ -50,6 +50,9 @@ export function NotebookEditorPage() {
     notebook?.sources.filter((source) => source.status === 'completed').map((source) => source.name) ?? []
   const deselectedSourceNames = notebook ? deselectedByNotebook[notebook.id] ?? [] : []
   const selectedSourceNames = completedSourceNames.filter((name) => !deselectedSourceNames.includes(name))
+  const activeItem = activeItemId
+    ? notebook?.studioDocuments.find((document) => document.id === activeItemId) ?? null
+    : null
 
   const sourcesWithSelection =
     notebook?.sources.map((source) => ({
@@ -206,10 +209,7 @@ export function NotebookEditorPage() {
 
     setNoteError(null)
     try {
-      const renamed = await renameNote(document.id, cleanTitle)
-      if (renamed) {
-        setActiveItem((current) => (current?.id === document.id ? renamed : current))
-      }
+      await renameNote(document.id, cleanTitle)
     } catch (err) {
       setNoteError((err as Error).message)
     }
@@ -223,7 +223,7 @@ export function NotebookEditorPage() {
     setNoteError(null)
     try {
       await deleteNote(document.id)
-      setActiveItem((current) => (current?.id === document.id ? null : current))
+      setActiveItemId((current) => (current === document.id ? null : current))
     } catch (err) {
       setNoteError((err as Error).message)
     }
@@ -253,7 +253,7 @@ export function NotebookEditorPage() {
     setNoteError(null)
     try {
       await deleteAudioOverview(document.id)
-      setActiveItem((current) => (current?.id === document.id ? null : current))
+      setActiveItemId((current) => (current === document.id ? null : current))
     } catch (err) {
       setNoteError((err as Error).message)
     }
@@ -427,7 +427,7 @@ export function NotebookEditorPage() {
           <div className="bg-surface-low px-5 py-4 xl:px-6">
             <StudioDocumentsPanel
               documents={notebook.studioDocuments}
-              onOpenDocument={setActiveItem}
+              onOpenDocument={(document) => setActiveItemId(document.id)}
               onCreateAudioOverview={() => {
                 void handleCreateAudioOverview()
               }}
@@ -474,7 +474,7 @@ export function NotebookEditorPage() {
               </div>
               <button
                 type="button"
-                onClick={() => setActiveItem(null)}
+                onClick={() => setActiveItemId(null)}
                 className="rounded-md p-1 text-muted transition hover:bg-surface-low hover:text-ink"
               >
                 <X className="h-4 w-4" />
