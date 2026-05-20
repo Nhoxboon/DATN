@@ -127,6 +127,15 @@ class Settings(BaseSettings):
     google_api_key: str = Field(..., description="Google Gemini API key for future RAG modules")
     document_processing_mode: str = Field(default="worker", description="Document processing mode: worker")
     uploads_dir: str = Field(default="/app/uploads", description="Local shared upload directory for worker mode")
+    audio_overview_bucket: str = Field(default="audio-overviews", description="Supabase Storage bucket for audio overviews")
+    audio_overview_tts_model: str = Field(
+        default="gemini-2.5-flash-preview-tts",
+        description="Gemini TTS model used to render audio overview transcripts",
+    )
+    audio_overview_min_duration_seconds: int = Field(
+        default=150,
+        description="Minimum rendered audio overview duration in seconds",
+    )
     datn_require_worker_mode: bool = Field(
         default=False,
         description="Fail startup unless document processing is configured for Celery worker mode",

@@ -2,6 +2,7 @@ export type AuthFormMode = 'login' | 'signup' | 'forgot-password'
 
 export type SourceKind = 'pdf' | 'docx' | 'txt'
 export type DocumentStatusValue = 'pending' | 'processing' | 'completed' | 'failed'
+export type AudioOverviewStatusValue = 'pending' | 'processing' | 'completed' | 'failed'
 
 export interface UserProfile {
   id: string
@@ -29,17 +30,40 @@ export interface SourceItem {
   errorMessage?: string | null
 }
 
-export interface StudioDocument {
+interface BaseStudioDocument {
   id: string
+  itemType: 'note' | 'audio_overview'
   title: string
   excerpt: string
   updatedAt: string
+  sortTimestamp?: string
+}
+
+export interface StudioNoteDocument extends BaseStudioDocument {
+  itemType: 'note'
   icon: 'description' | 'table_chart'
   question?: string
   answer?: string
   sources?: RagSource[]
   documentNames?: string[]
 }
+
+export interface AudioOverviewDocument extends BaseStudioDocument {
+  itemType: 'audio_overview'
+  icon: 'audio'
+  status: AudioOverviewStatusValue
+  style?: string | null
+  scriptText?: string | null
+  documentNames: string[]
+  durationSeconds?: number | null
+  storagePath?: string | null
+  contentType?: string | null
+  errorMessage?: string | null
+  audioUrl?: string | null
+  audioUrlExpiresAt?: number | null
+}
+
+export type StudioDocument = StudioNoteDocument | AudioOverviewDocument
 
 export interface ChatMessage {
   id: string
@@ -99,6 +123,27 @@ export interface BackendNotebookNote {
   document_names: string[]
   created_at: string
   updated_at: string
+}
+
+export interface BackendAudioOverview {
+  id: string
+  notebook_id: string
+  status: AudioOverviewStatusValue
+  storage_path: string | null
+  title: string
+  style: string | null
+  script_text: string | null
+  document_names: string[]
+  duration_seconds: number | null
+  content_type: string | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BackendAudioOverviewUrl {
+  audio_url: string
+  expires_in: number
 }
 
 export interface BackendNotebookDetail extends BackendNotebookSummary {

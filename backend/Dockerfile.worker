@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     libgomp1 \
     libreoffice-writer \
+    ffmpeg \
     poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
@@ -33,4 +34,4 @@ USER appuser
 CMD ["uv", "run", "celery", "-A", "app.workers.celery_app", "worker", \
      "--loglevel=info", \
      "--concurrency=2", \
-     "-Q", "document_processing,embedding,storage"]
+     "-Q", "document_processing,embedding,storage,audio_overviews"]

@@ -64,7 +64,7 @@ services:
       - --pool=solo
       - --concurrency=1
       - -Q
-      - document_processing,embedding,storage
+      - document_processing,embedding,storage,audio_overviews
     env_file:
       - .env
     environment:

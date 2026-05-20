@@ -83,6 +83,7 @@ const baseSources = [
 const baseStudioDocs = [
   {
     id: 'tech-design-note',
+    itemType: 'note' as const,
     icon: 'description' as const,
     title: 'Tech-Design Alignment Note',
     excerpt:
@@ -91,6 +92,7 @@ const baseStudioDocs = [
   },
   {
     id: 'feature-matrix',
+    itemType: 'note' as const,
     icon: 'table_chart' as const,
     title: 'Feature Comparison Matrix',
     excerpt:

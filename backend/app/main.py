@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.modules.audio_overviews import router as audio_overviews_router
 from app.routers import auth, notebooks
 
 
@@ -48,6 +49,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth.router)
     app.include_router(notebooks.router)
+    app.include_router(audio_overviews_router)
 
     @app.on_event("startup")
     async def log_runtime_settings() -> None:
