@@ -7,6 +7,7 @@ import { AddSourcesModal } from '../components/sources/AddSourcesModal'
 import { SynthesisCard } from '../components/chat/SynthesisCard'
 import { ChatComposer } from '../components/chat/ChatComposer'
 import { ChatMessageList, RichAnswerContent } from '../components/chat/ChatMessageList'
+import { AudioOverviewPlayer, type AudioPlaybackState } from '../components/history/AudioOverviewPlayer'
 import { StudioDocumentsPanel } from '../components/history/StudioDocumentsPanel'
 import { useChatManager } from '../hooks/useChatManager'
 import { useDocuments } from '../hooks/useDocuments'
@@ -29,6 +30,8 @@ export function NotebookEditorPage() {
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
   const [renaming, setRenaming] = useState(false)
+  const [audioPlaybackById, setAudioPlaybackById] = useState<Record<string, AudioPlaybackState>>({})
+  const [activeAudioPlayerId, setActiveAudioPlayerId] = useState<string | null>(null)
   const {
     loading,
     notebook,
@@ -42,6 +45,7 @@ export function NotebookEditorPage() {
     deleteNote,
     createAudioOverview,
     deleteAudioOverview,
+    refreshAudioOverviewUrl,
     error: documentError,
   } = useDocuments(notebookId)
   const { messages, isPending, error: chatError, sendMessage, newChat, saveNote } = useChatManager(notebookId)
@@ -63,6 +67,13 @@ export function NotebookEditorPage() {
   const allCompletedSelected =
     completedSourceNames.length > 0 && completedSourceNames.every((name) => selectedSourceNames.includes(name))
   const editorError = noteError || chatError || documentError
+
+  const handleAudioPlaybackChange = (documentId: string, playbackState: AudioPlaybackState) => {
+    setAudioPlaybackById((current) => ({
+      ...current,
+      [documentId]: playbackState,
+    }))
+  }
 
   const handleSignOut = async () => {
     await signOut()
@@ -443,6 +454,11 @@ export function NotebookEditorPage() {
               onRetryAudioOverview={(document) => {
                 void handleRetryAudioOverview(document)
               }}
+              onRefreshAudioUrl={(document) => refreshAudioOverviewUrl(document.id)}
+              audioPlaybackById={audioPlaybackById}
+              activeAudioPlayerId={activeAudioPlayerId}
+              onAudioPlaybackChange={handleAudioPlaybackChange}
+              onActiveAudioPlayerChange={setActiveAudioPlayerId}
               audioDisabled={!selectedSourceNames.length}
               audioBusy={creatingAudio}
             />
@@ -484,10 +500,19 @@ export function NotebookEditorPage() {
             <div className="space-y-5 px-6 py-5">
               {activeItem.itemType === 'audio_overview' ? (
                 <>
-                  {activeItem.audioUrl && (
+                  {activeItem.status === 'completed' && (
                     <section>
                       <h3 className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">Audio</h3>
-                      <audio controls src={activeItem.audioUrl} className="w-full" />
+                      <AudioOverviewPlayer
+                        document={activeItem}
+                        onRefreshAudioUrl={(document) => refreshAudioOverviewUrl(document.id)}
+                        playbackState={audioPlaybackById[activeItem.id]}
+                        activePlayerId={activeAudioPlayerId}
+                        playerId={`modal-${activeItem.id}`}
+                        onPlaybackStateChange={handleAudioPlaybackChange}
+                        onActivePlayerChange={setActiveAudioPlayerId}
+                        className="w-full"
+                      />
                     </section>
                   )}
                   {activeItem.scriptText && (

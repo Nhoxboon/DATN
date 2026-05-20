@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { AudioOverviewDocument, NotebookDetail, NotebookSummary, SourceItem, StudioDocument, UserProfile } from '../types'
 import { documentService } from '../services/documentService'
-import { audioOverviewService } from '../services/audioOverviewService'
+import { audioOverviewService, type AudioOverviewUrl } from '../services/audioOverviewService'
 import { useAuth } from './useAuth'
 
 function mergeStudioDocuments(notes: StudioDocument[], audioOverviews: AudioOverviewDocument[]) {
@@ -12,7 +12,27 @@ function mergeStudioDocuments(notes: StudioDocument[], audioOverviews: AudioOver
   })
 }
 
-function withAudioOverviews(notebook: NotebookDetail | null, audioOverviews: AudioOverviewDocument[]) {
+function preserveFreshAudioUrl(
+  audioOverview: AudioOverviewDocument,
+  existingAudioOverviews: AudioOverviewDocument[],
+) {
+  const existing = existingAudioOverviews.find((document) => document.id === audioOverview.id)
+  if (existing?.audioUrl) {
+    return {
+      ...audioOverview,
+      audioUrl: existing.audioUrl,
+      audioUrlExpiresAt: existing.audioUrlExpiresAt,
+    }
+  }
+
+  return audioOverview
+}
+
+function withAudioOverviews(
+  notebook: NotebookDetail | null,
+  audioOverviews: AudioOverviewDocument[],
+  existingAudioOverviews: AudioOverviewDocument[] = [],
+) {
   if (!notebook) {
     return null
   }
@@ -21,7 +41,7 @@ function withAudioOverviews(notebook: NotebookDetail | null, audioOverviews: Aud
     ...notebook,
     studioDocuments: mergeStudioDocuments(
       notebook.studioDocuments.filter((document) => document.itemType === 'note'),
-      audioOverviews,
+      audioOverviews.map((audioOverview) => preserveFreshAudioUrl(audioOverview, existingAudioOverviews)),
     ),
   }
 }
@@ -115,7 +135,15 @@ export function useDocuments(notebookId?: string) {
         documentService.getNotebookDetail(notebookId),
         audioOverviewService.getAudioOverviews(notebookId),
       ])
-      setNotebook(withAudioOverviews(notebookData, audioOverviews))
+      setNotebook((current) =>
+        withAudioOverviews(
+          notebookData,
+          audioOverviews,
+          current?.studioDocuments.filter(
+            (document): document is AudioOverviewDocument => document.itemType === 'audio_overview',
+          ) ?? [],
+        ),
+      )
     } catch (err) {
       setError((err as Error).message)
     }
@@ -162,34 +190,6 @@ export function useDocuments(notebookId?: string) {
       window.clearInterval(intervalId)
     }
   }, [notebook?.sources, notebook?.studioDocuments, notebookId, refreshNotebook])
-
-  useEffect(() => {
-    const hasCompletedAudio = notebook?.studioDocuments.some(
-      (document) => document.itemType === 'audio_overview' && document.status === 'completed',
-    )
-
-    if (!notebookId || !hasCompletedAudio) {
-      return undefined
-    }
-
-    const refreshAudioUrls = () => {
-      if (document.visibilityState === 'visible') {
-        void refreshNotebook()
-      }
-    }
-
-    const intervalId = window.setInterval(refreshAudioUrls, 55 * 60 * 1000)
-    const handleVisibilityChange = () => {
-      refreshAudioUrls()
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-
-    return () => {
-      window.clearInterval(intervalId)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [notebook?.studioDocuments, notebookId, refreshNotebook])
 
   const createNotebook = async () => {
     const created = await documentService.createNotebook()
@@ -427,6 +427,31 @@ export function useDocuments(notebookId?: string) {
     setSummaries(await documentService.getNotebookSummaries())
   }
 
+  const refreshAudioOverviewUrl = async (overviewId: string): Promise<AudioOverviewUrl | null> => {
+    if (!notebookId) {
+      return null
+    }
+
+    const audio = await audioOverviewService.getAudioUrl(notebookId, overviewId)
+    setNotebook((current) =>
+      current
+        ? {
+            ...current,
+            studioDocuments: current.studioDocuments.map((document) =>
+              document.itemType === 'audio_overview' && document.id === overviewId
+                ? {
+                    ...document,
+                    audioUrl: audio.audioUrl,
+                    audioUrlExpiresAt: audio.expiresAt,
+                  }
+                : document,
+            ),
+          }
+        : current,
+    )
+    return audio
+  }
+
   return {
     loading,
     error,
@@ -442,6 +467,7 @@ export function useDocuments(notebookId?: string) {
     deleteNote,
     createAudioOverview,
     deleteAudioOverview,
+    refreshAudioOverviewUrl,
     processUploads,
     addStudioDocument,
     reload: load,

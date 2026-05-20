@@ -19,7 +19,13 @@ from app.modules.audio_overviews.service import (
     AudioOverviewValidationError,
     AudioOverviewService,
 )
-from app.modules.audio_overviews.tasks import _coerce_audio_bytes, _parse_json_object, _require_min_duration
+from app.modules.audio_overviews.tasks import (
+    _coerce_audio_bytes,
+    _normalize_script_speaker_labels,
+    _parse_json_object,
+    _require_min_duration,
+)
+from app.modules.audio_overviews.tasks import generate_audio_overview_task
 
 
 def _now() -> str:
@@ -254,6 +260,33 @@ class AudioOverviewTaskHelperTests(unittest.TestCase):
 
     def test_require_min_duration_allows_disabled_minimum(self) -> None:
         _require_min_duration(0.0, 0)
+
+    def test_normalize_script_speaker_labels_removes_persona_names(self) -> None:
+        script = "Minh: Mở đầu.\nLan: Đúng vậy, Minh. Nội dung chính."
+
+        normalized = _normalize_script_speaker_labels(script, "podcast_dialogue", ["Minh", "Lan"])
+
+        self.assertIn("Speaker A: Mở đầu.", normalized)
+        self.assertIn("Speaker B: Đúng vậy. Nội dung chính.", normalized)
+        self.assertNotIn("Minh:", normalized)
+        self.assertNotIn("Lan:", normalized)
+        self.assertNotIn("Đúng vậy, Minh", normalized)
+
+    def test_task_skips_when_overview_was_deleted_before_worker_start(self) -> None:
+        client = FakeSupabaseClient()
+
+        with patch(
+            "app.modules.audio_overviews.tasks.get_settings",
+            return_value=SimpleNamespace(audio_overview_bucket="audio-overviews"),
+        ), patch("app.modules.audio_overviews.tasks.get_supabase_client", return_value=client), patch(
+            "app.modules.audio_overviews.tasks.get_app_config"
+        ) as get_app_config, patch("app.modules.audio_overviews.tasks.genai.Client") as genai_client:
+            result = generate_audio_overview_task.run("missing-overview", "notebook-1", "user-1", ["doc-a"])
+
+        self.assertEqual(result["status"], "cancelled")
+        self.assertEqual(result["reason"], "missing")
+        get_app_config.assert_not_called()
+        genai_client.assert_not_called()
 
 
 if __name__ == "__main__":

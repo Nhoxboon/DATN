@@ -1,7 +1,9 @@
 import { Headphones, Loader2, Mic, MoreVertical, Presentation, FileText, Pencil, RotateCcw, TableProperties, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { audioOverviewService } from '../../services/audioOverviewService'
+import type { AudioOverviewUrl } from '../../services/audioOverviewService'
 import type { AudioOverviewDocument, StudioDocument, StudioNoteDocument } from '../../types'
+import { AudioOverviewPlayer, type AudioPlaybackState } from './AudioOverviewPlayer'
 
 interface StudioDocumentsPanelProps {
   documents: StudioDocument[]
@@ -11,6 +13,11 @@ interface StudioDocumentsPanelProps {
   onDeleteNote?: (document: StudioNoteDocument) => void
   onDeleteAudioOverview?: (document: AudioOverviewDocument) => void
   onRetryAudioOverview?: (document: AudioOverviewDocument) => void
+  onRefreshAudioUrl?: (document: AudioOverviewDocument) => Promise<AudioOverviewUrl | null>
+  audioPlaybackById?: Record<string, AudioPlaybackState>
+  activeAudioPlayerId?: string | null
+  onAudioPlaybackChange?: (documentId: string, state: AudioPlaybackState) => void
+  onActiveAudioPlayerChange?: (playerId: string | null) => void
   audioDisabled?: boolean
   audioBusy?: boolean
 }
@@ -23,6 +30,11 @@ export function StudioDocumentsPanel({
   onDeleteNote,
   onDeleteAudioOverview,
   onRetryAudioOverview,
+  onRefreshAudioUrl,
+  audioPlaybackById = {},
+  activeAudioPlayerId,
+  onAudioPlaybackChange,
+  onActiveAudioPlayerChange,
   audioDisabled = false,
   audioBusy = false,
 }: StudioDocumentsPanelProps) {
@@ -124,11 +136,16 @@ export function StudioDocumentsPanel({
                       </div>
                     </div>
                   </button>
-                  {audioDocument?.status === 'completed' && audioDocument.audioUrl && (
+                  {audioDocument?.status === 'completed' && (audioDocument.audioUrl || onRefreshAudioUrl) && (
                     <div className="-mt-1 px-4 pb-4 pl-[3.25rem] pr-10">
-                      <audio
-                        controls
-                        src={audioDocument.audioUrl}
+                      <AudioOverviewPlayer
+                        document={audioDocument}
+                        onRefreshAudioUrl={onRefreshAudioUrl}
+                        playbackState={audioPlaybackById[audioDocument.id]}
+                        activePlayerId={activeAudioPlayerId}
+                        playerId={`saved-${audioDocument.id}`}
+                        onPlaybackStateChange={onAudioPlaybackChange}
+                        onActivePlayerChange={onActiveAudioPlayerChange}
                         className="h-8 w-full"
                       />
                     </div>

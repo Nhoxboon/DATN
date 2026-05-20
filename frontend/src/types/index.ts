@@ -60,6 +60,7 @@ export interface AudioOverviewDocument extends BaseStudioDocument {
   contentType?: string | null
   errorMessage?: string | null
   audioUrl?: string | null
+  audioUrlExpiresAt?: number | null
 }
 
 export type StudioDocument = StudioNoteDocument | AudioOverviewDocument

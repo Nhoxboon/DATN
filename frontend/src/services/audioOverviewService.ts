@@ -5,6 +5,11 @@ import type {
 } from '../types'
 import { apiFetch } from './api'
 
+export interface AudioOverviewUrl {
+  audioUrl: string
+  expiresAt: number
+}
+
 function updatedLabel(value: string | null | undefined) {
   if (!value) {
     return 'Updated just now'
@@ -51,7 +56,7 @@ function audioExcerpt(overview: BackendAudioOverview) {
   return script ? `${script}${(overview.script_text?.length ?? 0) > 150 ? '...' : ''}` : 'Ready to play.'
 }
 
-function toAudioDocument(overview: BackendAudioOverview, audioUrl?: string | null): AudioOverviewDocument {
+function toAudioDocument(overview: BackendAudioOverview, audio?: AudioOverviewUrl | null): AudioOverviewDocument {
   return {
     id: overview.id,
     itemType: 'audio_overview',
@@ -68,7 +73,8 @@ function toAudioDocument(overview: BackendAudioOverview, audioUrl?: string | nul
     storagePath: overview.storage_path,
     contentType: overview.content_type,
     errorMessage: overview.error_message,
-    audioUrl,
+    audioUrl: audio?.audioUrl ?? null,
+    audioUrlExpiresAt: audio?.expiresAt ?? null,
   }
 }
 
@@ -85,8 +91,8 @@ export const audioOverviewService = {
         }
 
         try {
-          const url = await this.getAudioUrl(notebookId, overview.id)
-          return toAudioDocument(overview, url)
+          const audio = await this.getAudioUrl(notebookId, overview.id)
+          return toAudioDocument(overview, audio)
         } catch {
           return toAudioDocument(overview)
         }
@@ -107,11 +113,15 @@ export const audioOverviewService = {
     return toAudioDocument(data)
   },
 
-  async getAudioUrl(notebookId: string, overviewId: string): Promise<string> {
+  async getAudioUrl(notebookId: string, overviewId: string): Promise<AudioOverviewUrl> {
+    const requestedAt = Date.now()
     const data = await apiFetch<BackendAudioOverviewUrl>(
       `/notebooks/${encodeURIComponent(notebookId)}/audio-overviews/${encodeURIComponent(overviewId)}/audio-url`,
     )
-    return data.audio_url
+    return {
+      audioUrl: data.audio_url,
+      expiresAt: requestedAt + data.expires_in * 1000,
+    }
   },
 
   async deleteAudioOverview(notebookId: string, overviewId: string): Promise<void> {
@@ -142,6 +152,7 @@ export const audioOverviewService = {
       contentType: 'audio/mp4',
       errorMessage: null,
       audioUrl: null,
+      audioUrlExpiresAt: null,
     }
   },
 
