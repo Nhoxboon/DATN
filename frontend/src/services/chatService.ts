@@ -172,10 +172,12 @@ function toStudioDocument(note: BackendNotebookNote): StudioDocument {
 
   return {
     id: note.id,
+    itemType: 'note',
     icon: 'description',
     title: note.question,
     excerpt: excerpt ? `${excerpt}${note.answer.length > 150 ? '...' : ''}` : 'Saved AI answer',
     updatedAt: 'Saved just now',
+    sortTimestamp: new Date().toISOString(),
     question: note.question,
     answer: note.answer,
     sources: note.sources,

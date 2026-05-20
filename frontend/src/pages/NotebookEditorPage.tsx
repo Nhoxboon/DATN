@@ -11,7 +11,7 @@ import { StudioDocumentsPanel } from '../components/history/StudioDocumentsPanel
 import { useChatManager } from '../hooks/useChatManager'
 import { useDocuments } from '../hooks/useDocuments'
 import { useAuth } from '../hooks/useAuth'
-import type { SourceItem, StudioDocument } from '../types'
+import type { AudioOverviewDocument, SourceItem, StudioDocument, StudioNoteDocument } from '../types'
 
 export function NotebookEditorPage() {
   const { notebookId = '' } = useParams()
@@ -22,8 +22,9 @@ export function NotebookEditorPage() {
   const avatarRef = useRef<HTMLButtonElement | null>(null)
   const [profileOpen, setProfileOpen] = useState(false)
   const [deselectedByNotebook, setDeselectedByNotebook] = useState<Record<string, string[]>>({})
-  const [activeNote, setActiveNote] = useState<StudioDocument | null>(null)
+  const [activeItem, setActiveItem] = useState<StudioDocument | null>(null)
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null)
+  const [creatingAudio, setCreatingAudio] = useState(false)
   const [noteError, setNoteError] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
@@ -39,6 +40,8 @@ export function NotebookEditorPage() {
     deleteSource,
     renameNote,
     deleteNote,
+    createAudioOverview,
+    deleteAudioOverview,
     error: documentError,
   } = useDocuments(notebookId)
   const { messages, isPending, error: chatError, sendMessage, newChat, saveNote } = useChatManager(notebookId)
@@ -193,7 +196,7 @@ export function NotebookEditorPage() {
     }
   }
 
-  const handleRenameNote = async (document: StudioDocument) => {
+  const handleRenameNote = async (document: StudioNoteDocument) => {
     const nextTitle = window.prompt('Rename note', document.title)
     const cleanTitle = nextTitle?.trim()
 
@@ -205,14 +208,14 @@ export function NotebookEditorPage() {
     try {
       const renamed = await renameNote(document.id, cleanTitle)
       if (renamed) {
-        setActiveNote((current) => (current?.id === document.id ? renamed : current))
+        setActiveItem((current) => (current?.id === document.id ? renamed : current))
       }
     } catch (err) {
       setNoteError((err as Error).message)
     }
   }
 
-  const handleDeleteNote = async (document: StudioDocument) => {
+  const handleDeleteNote = async (document: StudioNoteDocument) => {
     if (!window.confirm(`Delete note "${document.title}"?`)) {
       return
     }
@@ -220,9 +223,56 @@ export function NotebookEditorPage() {
     setNoteError(null)
     try {
       await deleteNote(document.id)
-      setActiveNote((current) => (current?.id === document.id ? null : current))
+      setActiveItem((current) => (current?.id === document.id ? null : current))
     } catch (err) {
       setNoteError((err as Error).message)
+    }
+  }
+
+  const handleCreateAudioOverview = async () => {
+    if (!selectedSourceNames.length || creatingAudio) {
+      return
+    }
+
+    setCreatingAudio(true)
+    setNoteError(null)
+    try {
+      await createAudioOverview(selectedSourceNames)
+    } catch (err) {
+      setNoteError((err as Error).message)
+    } finally {
+      setCreatingAudio(false)
+    }
+  }
+
+  const handleDeleteAudioOverview = async (document: AudioOverviewDocument) => {
+    if (!window.confirm(`Delete audio overview "${document.title}"?`)) {
+      return
+    }
+
+    setNoteError(null)
+    try {
+      await deleteAudioOverview(document.id)
+      setActiveItem((current) => (current?.id === document.id ? null : current))
+    } catch (err) {
+      setNoteError((err as Error).message)
+    }
+  }
+
+  const handleRetryAudioOverview = async (document: AudioOverviewDocument) => {
+    const documentNames = document.documentNames.length ? document.documentNames : selectedSourceNames
+    if (!documentNames.length || creatingAudio) {
+      return
+    }
+
+    setCreatingAudio(true)
+    setNoteError(null)
+    try {
+      await createAudioOverview(documentNames)
+    } catch (err) {
+      setNoteError((err as Error).message)
+    } finally {
+      setCreatingAudio(false)
     }
   }
 
@@ -377,13 +427,24 @@ export function NotebookEditorPage() {
           <div className="bg-surface-low px-5 py-4 xl:px-6">
             <StudioDocumentsPanel
               documents={notebook.studioDocuments}
-              onOpenDocument={setActiveNote}
+              onOpenDocument={setActiveItem}
+              onCreateAudioOverview={() => {
+                void handleCreateAudioOverview()
+              }}
               onRenameNote={(document) => {
                 void handleRenameNote(document)
               }}
               onDeleteNote={(document) => {
                 void handleDeleteNote(document)
               }}
+              onDeleteAudioOverview={(document) => {
+                void handleDeleteAudioOverview(document)
+              }}
+              onRetryAudioOverview={(document) => {
+                void handleRetryAudioOverview(document)
+              }}
+              audioDisabled={!selectedSourceNames.length}
+              audioBusy={creatingAudio}
             />
           </div>
         </div>
@@ -401,19 +462,19 @@ export function NotebookEditorPage() {
         />
       )}
 
-      {activeNote && (
+      {activeItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(12,15,16,0.25)] px-4 py-8 backdrop-blur-[3px]">
           <article className="max-h-[86vh] w-full max-w-[760px] overflow-y-auto rounded-[14px] bg-white shadow-[0_24px_80px_rgba(43,52,55,0.2)]">
             <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-black/8 bg-white px-6 py-4">
               <div>
                 <div className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted">
-                  Saved Note
+                  {activeItem.itemType === 'audio_overview' ? 'Audio Overview' : 'Saved Note'}
                 </div>
-                <h2 className="mt-1 text-[1.2rem] font-medium leading-7 text-ink">{activeNote.title}</h2>
+                <h2 className="mt-1 text-[1.2rem] font-medium leading-7 text-ink">{activeItem.title}</h2>
               </div>
               <button
                 type="button"
-                onClick={() => setActiveNote(null)}
+                onClick={() => setActiveItem(null)}
                 className="rounded-md p-1 text-muted transition hover:bg-surface-low hover:text-ink"
               >
                 <X className="h-4 w-4" />
@@ -421,35 +482,69 @@ export function NotebookEditorPage() {
             </div>
 
             <div className="space-y-5 px-6 py-5">
-              {activeNote.question && (
-                <section>
-                  <h3 className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">Question</h3>
-                  <p className="text-[0.92rem] leading-7 text-ink">{activeNote.question}</p>
-                </section>
-              )}
-              {activeNote.answer && (
-                <section>
-                  <h3 className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">Answer</h3>
-                  <div className="text-[0.92rem] leading-7 text-ink">
-                    <RichAnswerContent content={activeNote.answer} sources={activeNote.sources} />
-                  </div>
-                </section>
-              )}
-              {Boolean(activeNote.sources?.length) && (
-                <section>
-                  <h3 className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">Sources</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {activeNote.sources?.map((source, index) => (
-                      <span
-                        key={`${activeNote.id}-${source.document}-${index}`}
-                        className="rounded-md bg-surface-low px-2 py-1 text-[0.68rem] text-muted"
-                      >
-                        {source.document}
-                        {source.page_range ? ` - ${source.page_range}` : ''}
-                      </span>
-                    ))}
-                  </div>
-                </section>
+              {activeItem.itemType === 'audio_overview' ? (
+                <>
+                  {activeItem.audioUrl && (
+                    <section>
+                      <h3 className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">Audio</h3>
+                      <audio controls src={activeItem.audioUrl} className="w-full" />
+                    </section>
+                  )}
+                  {activeItem.scriptText && (
+                    <section>
+                      <h3 className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">Script</h3>
+                      <div className="whitespace-pre-wrap text-[0.92rem] leading-7 text-ink">{activeItem.scriptText}</div>
+                    </section>
+                  )}
+                  {Boolean(activeItem.documentNames.length) && (
+                    <section>
+                      <h3 className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">Sources</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {activeItem.documentNames.map((documentName) => (
+                          <span
+                            key={`${activeItem.id}-${documentName}`}
+                            className="rounded-md bg-surface-low px-2 py-1 text-[0.68rem] text-muted"
+                          >
+                            {documentName}
+                          </span>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </>
+              ) : (
+                <>
+                  {activeItem.question && (
+                    <section>
+                      <h3 className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">Question</h3>
+                      <p className="text-[0.92rem] leading-7 text-ink">{activeItem.question}</p>
+                    </section>
+                  )}
+                  {activeItem.answer && (
+                    <section>
+                      <h3 className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">Answer</h3>
+                      <div className="text-[0.92rem] leading-7 text-ink">
+                        <RichAnswerContent content={activeItem.answer} sources={activeItem.sources} />
+                      </div>
+                    </section>
+                  )}
+                  {Boolean(activeItem.sources?.length) && (
+                    <section>
+                      <h3 className="mb-2 text-[0.72rem] font-semibold uppercase tracking-[0.12em] text-muted">Sources</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {activeItem.sources?.map((source, index) => (
+                          <span
+                            key={`${activeItem.id}-${source.document}-${index}`}
+                            className="rounded-md bg-surface-low px-2 py-1 text-[0.68rem] text-muted"
+                          >
+                            {source.document}
+                            {source.page_range ? ` - ${source.page_range}` : ''}
+                          </span>
+                        ))}
+                      </div>
+                    </section>
+                  )}
+                </>
               )}
             </div>
           </article>

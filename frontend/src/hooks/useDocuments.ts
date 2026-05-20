@@ -1,7 +1,30 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { NotebookDetail, NotebookSummary, SourceItem, UserProfile } from '../types'
+import type { AudioOverviewDocument, NotebookDetail, NotebookSummary, SourceItem, StudioDocument, UserProfile } from '../types'
 import { documentService } from '../services/documentService'
+import { audioOverviewService } from '../services/audioOverviewService'
 import { useAuth } from './useAuth'
+
+function mergeStudioDocuments(notes: StudioDocument[], audioOverviews: AudioOverviewDocument[]) {
+  return [...audioOverviews, ...notes].sort((left, right) => {
+    const leftTime = new Date(left.sortTimestamp || '').getTime()
+    const rightTime = new Date(right.sortTimestamp || '').getTime()
+    return (Number.isNaN(rightTime) ? 0 : rightTime) - (Number.isNaN(leftTime) ? 0 : leftTime)
+  })
+}
+
+function withAudioOverviews(notebook: NotebookDetail | null, audioOverviews: AudioOverviewDocument[]) {
+  if (!notebook) {
+    return null
+  }
+
+  return {
+    ...notebook,
+    studioDocuments: mergeStudioDocuments(
+      notebook.studioDocuments.filter((document) => document.itemType === 'note'),
+      audioOverviews,
+    ),
+  }
+}
 
 export function useDocuments(notebookId?: string) {
   const { user } = useAuth()
@@ -57,14 +80,15 @@ export function useDocuments(notebookId?: string) {
     setError(null)
 
     try {
-      const [summaryData, notebookData] = await Promise.all([
+      const [summaryData, notebookData, audioOverviews] = await Promise.all([
         documentService.getNotebookSummaries(),
         notebookId ? documentService.getNotebookDetail(notebookId) : Promise.resolve(null),
+        notebookId ? audioOverviewService.getAudioOverviews(notebookId) : Promise.resolve([]),
       ])
 
       setProfile(userProfile)
       setSummaries(summaryData)
-      setNotebook(notebookData)
+      setNotebook(withAudioOverviews(notebookData, audioOverviews))
     } catch (err) {
       setError((err as Error).message)
       if (isBlockingLoad) {
@@ -87,7 +111,11 @@ export function useDocuments(notebookId?: string) {
 
     try {
       setError(null)
-      setNotebook(await documentService.getNotebookDetail(notebookId))
+      const [notebookData, audioOverviews] = await Promise.all([
+        documentService.getNotebookDetail(notebookId),
+        audioOverviewService.getAudioOverviews(notebookId),
+      ])
+      setNotebook(withAudioOverviews(notebookData, audioOverviews))
     } catch (err) {
       setError((err as Error).message)
     }
@@ -114,8 +142,13 @@ export function useDocuments(notebookId?: string) {
     const hasProcessingSources = notebook?.sources.some(
       (source) => source.status === 'pending' || source.status === 'processing',
     )
+    const hasProcessingAudio = notebook?.studioDocuments.some(
+      (document) =>
+        document.itemType === 'audio_overview' &&
+        (document.status === 'pending' || document.status === 'processing'),
+    )
 
-    if (!notebookId || !hasProcessingSources) {
+    if (!notebookId || (!hasProcessingSources && !hasProcessingAudio)) {
       return undefined
     }
 
@@ -128,7 +161,7 @@ export function useDocuments(notebookId?: string) {
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [notebook?.sources, notebookId, refreshNotebook])
+  }, [notebook?.sources, notebook?.studioDocuments, notebookId, refreshNotebook])
 
   const createNotebook = async () => {
     const created = await documentService.createNotebook()
@@ -144,7 +177,16 @@ export function useDocuments(notebookId?: string) {
 
   const renameNotebook = async (id: string, title: string) => {
     const renamed = await documentService.updateNotebook(id, { title })
-    setNotebook((current) => (current?.id === id ? renamed : current))
+    setNotebook((current) =>
+      current?.id === id
+        ? withAudioOverviews(
+            renamed,
+            current.studioDocuments.filter(
+              (document): document is AudioOverviewDocument => document.itemType === 'audio_overview',
+            ),
+          )
+        : current,
+    )
     setSummaries((current) =>
       current.map((summary) =>
         summary.id === id
@@ -167,7 +209,14 @@ export function useDocuments(notebookId?: string) {
 
     const renamed = await documentService.renameDocument(notebookId, documentName, nextDocumentName)
     const refreshedSummaries = await documentService.getNotebookSummaries()
-    setNotebook(renamed)
+    setNotebook((current) =>
+      withAudioOverviews(
+        renamed,
+        current?.studioDocuments.filter(
+          (document): document is AudioOverviewDocument => document.itemType === 'audio_overview',
+        ) ?? [],
+      ),
+    )
     setSummaries(refreshedSummaries)
     return renamed
   }
@@ -178,11 +227,12 @@ export function useDocuments(notebookId?: string) {
     }
 
     await documentService.deleteDocument(notebookId, documentName)
-    const [refreshedSummaries, refreshedNotebook] = await Promise.all([
+    const [refreshedSummaries, refreshedNotebook, audioOverviews] = await Promise.all([
       documentService.getNotebookSummaries(),
       documentService.getNotebookDetail(notebookId),
+      audioOverviewService.getAudioOverviews(notebookId),
     ])
-    setNotebook(refreshedNotebook)
+    setNotebook(withAudioOverviews(refreshedNotebook, audioOverviews))
     setSummaries(refreshedSummaries)
   }
 
@@ -257,15 +307,23 @@ export function useDocuments(notebookId?: string) {
       for (const file of files) {
         updatedNotebook = await documentService.uploadDocument(notebookId, file)
         if (updatedNotebook) {
-          setNotebook(updatedNotebook)
+          setNotebook((current) =>
+            withAudioOverviews(
+              updatedNotebook,
+              current?.studioDocuments.filter(
+                (document): document is AudioOverviewDocument => document.itemType === 'audio_overview',
+              ) ?? [],
+            ),
+          )
         }
       }
 
-      const [refreshedSummaries, refreshedNotebook] = await Promise.all([
+      const [refreshedSummaries, refreshedNotebook, audioOverviews] = await Promise.all([
         documentService.getNotebookSummaries(),
         documentService.getNotebookDetail(notebookId),
+        audioOverviewService.getAudioOverviews(notebookId),
       ])
-      setNotebook(refreshedNotebook)
+      setNotebook(withAudioOverviews(refreshedNotebook, audioOverviews))
       setSummaries(refreshedSummaries)
     } catch (err) {
       setError((err as Error).message)
@@ -284,6 +342,67 @@ export function useDocuments(notebookId?: string) {
     )
   }
 
+  const createAudioOverview = async (documentNames: string[]) => {
+    if (!notebookId || !documentNames.length) {
+      return null
+    }
+
+    const pendingDocument = audioOverviewService.makePendingDocument(documentNames)
+    setError(null)
+    setNotebook((current) =>
+      current
+        ? {
+            ...current,
+            studioDocuments: [pendingDocument, ...current.studioDocuments],
+          }
+        : current,
+    )
+
+    try {
+      const created = await audioOverviewService.createAudioOverview(notebookId, documentNames)
+      setNotebook((current) =>
+        current
+          ? {
+              ...current,
+              studioDocuments: current.studioDocuments.map((document) =>
+                document.id === pendingDocument.id ? created : document,
+              ),
+            }
+          : current,
+      )
+      setSummaries(await documentService.getNotebookSummaries())
+      return created
+    } catch (err) {
+      setError((err as Error).message)
+      setNotebook((current) =>
+        current
+          ? {
+              ...current,
+              studioDocuments: current.studioDocuments.filter((document) => document.id !== pendingDocument.id),
+            }
+          : current,
+      )
+      return null
+    }
+  }
+
+  const deleteAudioOverview = async (overviewId: string) => {
+    if (!notebookId) {
+      return
+    }
+
+    await audioOverviewService.deleteAudioOverview(notebookId, overviewId)
+    setNotebook((current) =>
+      current
+        ? {
+            ...current,
+            studioDocuments: current.studioDocuments.filter((document) => document.id !== overviewId),
+          }
+        : current,
+    )
+    setSummaries(await documentService.getNotebookSummaries())
+  }
+
   return {
     loading,
     error,
@@ -297,6 +416,8 @@ export function useDocuments(notebookId?: string) {
     deleteSource,
     renameNote,
     deleteNote,
+    createAudioOverview,
+    deleteAudioOverview,
     processUploads,
     addStudioDocument,
     reload: load,

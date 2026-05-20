@@ -23,6 +23,7 @@ celery_app = Celery(
         "app.workers.tasks.document",
         "app.workers.tasks.embedding",
         "app.workers.tasks.storage",
+        "app.modules.audio_overviews.tasks",
     ]
 )
 
@@ -45,6 +46,7 @@ celery_app.conf.update(
         "app.workers.tasks.document.*": {"queue": "document_processing"},
         "app.workers.tasks.embedding.*": {"queue": "embedding"},
         "app.workers.tasks.storage.*": {"queue": "storage"},
+        "app.modules.audio_overviews.tasks.*": {"queue": "audio_overviews"},
     },
     task_annotations={
         "app.workers.tasks.embedding.generate_embedding_task": {
@@ -68,5 +70,5 @@ def log_worker_ready(sender=None, **_kwargs):
         settings.document_processing_mode,
         settings.redis_url,
         settings.uploads_dir,
-        "document_processing,embedding,storage",
+        "document_processing,embedding,storage,audio_overviews",
     )
