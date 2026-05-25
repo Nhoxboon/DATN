@@ -11,6 +11,9 @@ export type SlideLayoutType =
   | 'THREE_FEATURES'
   | 'BIG_STAT'
   | 'FIGURE_FOCUS'
+  | 'SECTION_DIVIDER'
+  | 'HIGHLIGHT_CARD'
+  | 'TIMELINE'
   | 'SUMMARY'
 
 export interface UserProfile {

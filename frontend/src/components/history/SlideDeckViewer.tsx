@@ -1,6 +1,5 @@
 import { ChevronLeft, ChevronRight, Download, ZoomIn, ZoomOut } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { slideDeckService } from '../../services/slideDeckService'
 import type { SlideDeckDocument, SlideDeckSlide } from '../../types'
 
 interface SlideDeckViewerProps {
@@ -13,7 +12,6 @@ export function SlideDeckViewer({ document, onRefreshPdfUrl }: SlideDeckViewerPr
   const [activeIndex, setActiveIndex] = useState(0)
   const [zoom, setZoom] = useState(1)
   const activeSlide = slides[Math.min(activeIndex, Math.max(slides.length - 1, 0))]
-  const subtitle = slideDeckService.sourceLabel(document.sourceCount)
 
   const slideStyle = useMemo(
     () => ({
@@ -52,7 +50,6 @@ export function SlideDeckViewer({ document, onRefreshPdfUrl }: SlideDeckViewerPr
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-muted">Presentation</div>
-          <div className="mt-1 text-[0.76rem] text-muted">{subtitle}</div>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -102,7 +99,7 @@ export function SlideDeckViewer({ document, onRefreshPdfUrl }: SlideDeckViewerPr
 
         <div className="overflow-auto rounded-xl bg-[#202529] p-4">
           <div className="mx-auto w-full max-w-[860px]" style={slideStyle}>
-            <SlidePreview slide={activeSlide} deckTitle={document.title} sourceCount={document.sourceCount} />
+            <SlidePreview slide={activeSlide} deckTitle={document.title} />
           </div>
         </div>
       </div>
@@ -137,15 +134,17 @@ export function SlideDeckViewer({ document, onRefreshPdfUrl }: SlideDeckViewerPr
 function SlidePreview({
   slide,
   deckTitle,
-  sourceCount,
 }: {
   slide: SlideDeckSlide
   deckTitle: string
-  sourceCount: number
 }) {
   const visualUrl = slide.visual?.data_url || null
   const content = slide.content ?? {}
   const layout = slide.layout_type
+
+  if (layout === 'SECTION_DIVIDER') {
+    return <SectionDivider slide={slide} deckTitle={deckTitle} />
+  }
 
   return (
     <div className="aspect-video w-full overflow-hidden bg-[#f7fafb] p-[5.5%] text-ink shadow-[0_20px_80px_rgba(0,0,0,0.25)]">
@@ -166,11 +165,26 @@ function SlidePreview({
         <BigStat content={content} />
       ) : layout === 'FIGURE_FOCUS' ? (
         <FigureFocus slide={slide} visualUrl={visualUrl} />
+      ) : layout === 'HIGHLIGHT_CARD' ? (
+        <HighlightCard slide={slide} visualUrl={visualUrl} />
+      ) : layout === 'TIMELINE' ? (
+        <TimelineSlide content={content} />
+      ) : layout === 'SUMMARY' ? (
+        <SummarySlide slide={slide} />
       ) : (
         <BulletSlide slide={slide} />
       )}
-      <div className="mt-auto text-[clamp(0.55rem,1vw,0.8rem)] text-[#819097]">
-        Based on {sourceCount} source{sourceCount === 1 ? '' : 's'}
+    </div>
+  )
+}
+
+function SectionDivider({ slide, deckTitle }: { slide: SlideDeckSlide; deckTitle: string }) {
+  return (
+    <div className="aspect-video w-full overflow-hidden bg-[#1f5666] p-[5.5%] text-white shadow-[0_20px_80px_rgba(0,0,0,0.25)]">
+      <div className="mb-10 h-1.5 w-40 bg-[#d89c2b]" />
+      <div className="flex h-[74%] flex-col justify-center">
+        <h3 className="max-w-[78%] text-[clamp(2rem,4vw,4.4rem)] font-bold leading-[1.05]">{slide.title || deckTitle}</h3>
+        {slide.subtitle && <p className="mt-6 max-w-[72%] text-[clamp(1rem,2vw,1.8rem)] leading-tight text-[#dce9ed]">{slide.subtitle}</p>}
       </div>
     </div>
   )
@@ -186,6 +200,23 @@ function BulletSlide({ slide }: { slide: SlideDeckSlide }) {
           <div key={`${slide.slide_number}-bullet-${index}`} className="flex items-start gap-3 text-[clamp(0.86rem,1.6vw,1.4rem)] leading-snug">
             <span className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[#d89c2b]" />
             <span>{bullet}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function SummarySlide({ slide }: { slide: SlideDeckSlide }) {
+  const bullets = slide.bullets?.length ? slide.bullets.slice(0, 3) : visibleStrings(slide.content).slice(0, 3)
+  return (
+    <div className="flex h-[78%] flex-col justify-center">
+      <h3 className="mb-8 max-w-[78%] text-[clamp(1.3rem,3vw,2.6rem)] font-bold leading-tight text-[#1f5666]">{slide.title}</h3>
+      <div className="grid gap-4 md:grid-cols-3">
+        {bullets.map((bullet, index) => (
+          <div key={`${slide.slide_number}-summary-${index}`} className="min-h-40 rounded-lg border border-[#d9e2e6] bg-white p-5">
+            <div className="mb-5 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#d89c2b] text-[0.75rem] font-bold text-white">{index + 1}</div>
+            <p className="text-[clamp(0.8rem,1.35vw,1.08rem)] font-semibold leading-snug text-[#1f5666]">{bullet}</p>
           </div>
         ))}
       </div>
@@ -235,12 +266,56 @@ function ThreeFeatures({ content }: { content: Record<string, unknown> }) {
   )
 }
 
+function TimelineSlide({ content }: { content: Record<string, unknown> }) {
+  const steps = Array.isArray(content.steps)
+    ? content.steps.slice(0, 4)
+    : visibleStrings(content)
+        .slice(0, 4)
+        .map((text, index) => ({ title: `Step ${index + 1}`, text }))
+  return (
+    <div className="flex h-[78%] items-center">
+      <div className="relative grid w-full gap-4 md:grid-cols-4">
+        <div className="absolute left-[8%] right-[8%] top-10 hidden h-1 bg-[#c7d5da] md:block" />
+        {steps.map((step, index) => {
+          const item = step && typeof step === 'object' ? (step as Record<string, unknown>) : {}
+          return (
+            <div key={`timeline-${index}`} className="relative">
+              <div className="mb-5 inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#1f5666] text-sm font-bold text-white">{index + 1}</div>
+              <h4 className="mb-3 text-[clamp(0.9rem,1.5vw,1.22rem)] font-bold leading-tight text-[#1f5666]">{String(item.title || '')}</h4>
+              <p className="text-[clamp(0.72rem,1.2vw,0.95rem)] leading-snug text-[#2b3437]">{String(item.text || '')}</p>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function BigStat({ content }: { content: Record<string, unknown> }) {
   return (
     <div className="flex h-[78%] flex-col justify-center rounded-lg border border-[#d9e2e6] bg-white p-8">
       <div className="text-[clamp(2.6rem,6vw,6rem)] font-bold leading-none text-[#1f5666]">{String(content.stat || '')}</div>
       <div className="mt-5 text-[clamp(1rem,2vw,1.7rem)] font-semibold leading-tight">{String(content.label || '')}</div>
       <div className="mt-4 max-w-[76%] text-[clamp(0.72rem,1.3vw,1rem)] text-[#586064]">{String(content.context || '')}</div>
+    </div>
+  )
+}
+
+function HighlightCard({ slide, visualUrl }: { slide: SlideDeckSlide; visualUrl: string | null }) {
+  const content = slide.content ?? {}
+  return (
+    <div className={`grid h-[78%] items-center gap-6 ${visualUrl ? 'md:grid-cols-[1.05fr_1fr]' : ''}`}>
+      {visualUrl && (
+        <div className="flex h-full items-center justify-center rounded-lg border border-[#d9e2e6] bg-white">
+          <img src={visualUrl} alt={slide.visual?.alt || ''} className="max-h-full max-w-full object-contain" />
+        </div>
+      )}
+      <div className="rounded-lg border border-[#d9e2e6] bg-white p-8">
+        <div className="mb-4 text-[clamp(0.72rem,1.1vw,0.9rem)] font-semibold uppercase tracking-[0.08em] text-[#d89c2b]">{String(content.label || 'Key idea')}</div>
+        <h3 className="mb-5 text-[clamp(1.4rem,3vw,2.6rem)] font-bold leading-tight text-[#1f5666]">{slide.title}</h3>
+        <p className="text-[clamp(0.85rem,1.5vw,1.16rem)] leading-snug">{String(content.context || '')}</p>
+        {content.takeaway ? <p className="mt-5 text-[clamp(0.75rem,1.25vw,0.98rem)] leading-snug text-[#586064]">{String(content.takeaway)}</p> : null}
+      </div>
     </div>
   )
 }

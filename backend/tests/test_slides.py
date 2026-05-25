@@ -248,10 +248,11 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
         self.assertEqual(payload["title"], "Deck")
 
     def test_deck_validation_enforces_slide_count_and_concise_text(self) -> None:
+        layout_cycle = ["KEY_BULLETS", "TWO_COLUMNS", "THREE_FEATURES", "BIG_STAT", "TIMELINE"]
         valid_slides = [
             {
                 "slide_number": index,
-                "layout_type": "KEY_BULLETS" if index % 2 else "SUMMARY",
+                "layout_type": layout_cycle[index - 1],
                 "title": f"Slide {index}",
                 "bullets": ["Core idea only"],
                 "content": {},
@@ -270,10 +271,11 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
             SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": [invalid, *valid_slides[1:]]})
 
     def test_deck_validation_rejects_visible_citations(self) -> None:
+        layout_cycle = ["KEY_BULLETS", "TWO_COLUMNS", "THREE_FEATURES", "BIG_STAT", "TIMELINE"]
         slides = [
             {
                 "slide_number": index,
-                "layout_type": "KEY_BULLETS" if index % 2 else "SUMMARY",
+                "layout_type": layout_cycle[index - 1],
                 "title": "Finding [1]" if index == 1 else f"Slide {index}",
                 "bullets": ["Core idea"],
                 "content": {},
@@ -284,6 +286,52 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": slides})
+
+    def test_deck_validation_rejects_final_summary_slide(self) -> None:
+        layout_cycle = ["TITLE", "TWO_COLUMNS", "THREE_FEATURES", "BIG_STAT", "HIGHLIGHT_CARD"]
+        slides = [
+            {
+                "slide_number": index,
+                "layout_type": layout_cycle[index - 1],
+                "title": "Tom tat" if index == 5 else f"Slide {index}",
+                "bullets": [],
+                "content": {},
+                "visual": {"kind": "none"},
+            }
+            for index in range(1, 6)
+        ]
+
+        with self.assertRaises(ValueError):
+            SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": slides})
+
+    def test_deck_validation_rejects_bullet_fatigue_and_duplicate_visuals(self) -> None:
+        bullet_heavy = [
+            {
+                "slide_number": index,
+                "layout_type": "KEY_BULLETS" if index < 4 else "TWO_COLUMNS",
+                "title": f"Slide {index}",
+                "bullets": ["Core idea"],
+                "content": {},
+                "visual": {"kind": "none"},
+            }
+            for index in range(1, 6)
+        ]
+        with self.assertRaises(ValueError):
+            SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": bullet_heavy})
+
+        duplicate_visuals = [
+            {
+                "slide_number": index,
+                "layout_type": "FIGURE_FOCUS" if index in {1, 2} else ["TWO_COLUMNS", "THREE_FEATURES", "BIG_STAT"][index - 3],
+                "title": f"Slide {index}",
+                "bullets": [],
+                "content": {"caption": "Diagram", "takeaway": "Key relation"} if index in {1, 2} else {},
+                "visual": {"kind": "source_page", "source_index": 1, "page": 3} if index in {1, 2} else {"kind": "none"},
+            }
+            for index in range(1, 6)
+        ]
+        with self.assertRaises(ValueError):
+            SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": duplicate_visuals})
 
     def test_visual_candidates_extract_visual_source_pages(self) -> None:
         candidates = _visual_candidates(

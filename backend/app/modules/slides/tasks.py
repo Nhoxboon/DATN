@@ -9,6 +9,7 @@ import logging
 import math
 import re
 import tempfile
+import unicodedata
 from pathlib import Path
 from typing import Any, Literal
 
@@ -32,11 +33,25 @@ MAX_SLIDES = 12
 MAX_CONTEXT_CHARS = 42000
 BATCH_CONTEXT_CHARS = 6000
 MAX_DECK_ATTEMPTS = 3
+MAX_DECK_OUTPUT_TOKENS = 12000
 MAX_WORDS_PER_SLIDE = 70
 MAX_WORDS_PER_BULLET = 20
 MAX_BULLETS_PER_SLIDE = 4
 SLIDE_WIDTH = 1600
 SLIDE_HEIGHT = 900
+PDF_RENDER_SCALE = 2
+BULLET_LIKE_LAYOUTS = {"KEY_BULLETS"}
+VISUAL_LAYOUTS = {"TITLE", "FIGURE_FOCUS", "HIGHLIGHT_CARD"}
+FINAL_SUMMARY_TITLES = {
+    "tom tat",
+    "tong ket",
+    "ket luan",
+    "summary",
+    "recap",
+    "conclusion",
+    "takeaways",
+    "key takeaways",
+}
 ALLOWED_LAYOUTS = {
     "TITLE",
     "KEY_BULLETS",
@@ -44,7 +59,9 @@ ALLOWED_LAYOUTS = {
     "THREE_FEATURES",
     "BIG_STAT",
     "FIGURE_FOCUS",
-    "SUMMARY",
+    "SECTION_DIVIDER",
+    "HIGHLIGHT_CARD",
+    "TIMELINE",
 }
 CITATION_PATTERN = re.compile(r"\[(?:\d+(?:\s*,\s*\d+)*)\]")
 
@@ -60,6 +77,29 @@ class SlideVisual(BaseModel):
     data_url: str | None = None
 
 
+class SlideFeature(BaseModel):
+    """Feature item used by THREE_FEATURES slides."""
+
+    title: str | None = None
+    text: str | None = None
+
+
+class SlideContent(BaseModel):
+    """Layout-specific slide content with a schema Gemini can follow."""
+
+    left_title: str | None = None
+    right_title: str | None = None
+    left: list[str] = Field(default_factory=list)
+    right: list[str] = Field(default_factory=list)
+    features: list[SlideFeature] = Field(default_factory=list)
+    stat: str | None = None
+    label: str | None = None
+    context: str | None = None
+    caption: str | None = None
+    takeaway: str | None = None
+    steps: list[SlideFeature] = Field(default_factory=list)
+
+
 class SlidePayload(BaseModel):
     """One normalized slide returned by the LLM."""
 
@@ -71,12 +111,14 @@ class SlidePayload(BaseModel):
         "THREE_FEATURES",
         "BIG_STAT",
         "FIGURE_FOCUS",
-        "SUMMARY",
+        "SECTION_DIVIDER",
+        "HIGHLIGHT_CARD",
+        "TIMELINE",
     ]
     title: str = ""
     subtitle: str | None = None
     bullets: list[str] = Field(default_factory=list)
-    content: dict[str, Any] = Field(default_factory=dict)
+    content: SlideContent = Field(default_factory=SlideContent)
     visual: SlideVisual = Field(default_factory=SlideVisual)
 
     @field_validator("bullets")
@@ -98,7 +140,7 @@ class SlidePayload(BaseModel):
                 "title": self.title,
                 "subtitle": self.subtitle,
                 "bullets": self.bullets,
-                "content": self.content,
+                "content": self.content.model_dump(),
             }
         )
         for text in visible_text:
@@ -124,9 +166,14 @@ class SlideDeckPayload(BaseModel):
             raise ValueError(f"Deck must contain {MIN_SLIDES}-{MAX_SLIDES} slides.")
         if self.slide_count != len(self.slides):
             raise ValueError("slide_count must match the number of slides.")
+        if _normalized_label(self.slides[-1].title) in FINAL_SUMMARY_TITLES:
+            raise ValueError("Do not create a final generic summary, recap, or conclusion slide.")
 
         previous_layout = ""
         repeat_count = 0
+        bullet_like_streak = 0
+        used_source_visuals: set[tuple[int | None, int | None]] = set()
+        source_visual_count = 0
         for index, slide in enumerate(self.slides, 1):
             if slide.slide_number != index:
                 raise ValueError("Slide numbers must be sequential starting at 1.")
@@ -137,6 +184,26 @@ class SlideDeckPayload(BaseModel):
             else:
                 previous_layout = slide.layout_type
                 repeat_count = 1
+
+            if slide.layout_type in BULLET_LIKE_LAYOUTS:
+                bullet_like_streak += 1
+                if bullet_like_streak > 2:
+                    raise ValueError("Do not use bullet-like layouts more than two times consecutively.")
+            else:
+                bullet_like_streak = 0
+
+            if slide.visual.kind != "none" and slide.layout_type not in VISUAL_LAYOUTS:
+                raise ValueError("Visuals are only allowed on TITLE, FIGURE_FOCUS, or HIGHLIGHT_CARD slides.")
+            if slide.visual.kind == "source_page":
+                source_visual_count += 1
+                visual_key = (slide.visual.source_index, slide.visual.page)
+                if visual_key in used_source_visuals:
+                    raise ValueError("Do not reuse the same source visual page across multiple slides.")
+                used_source_visuals.add(visual_key)
+
+        max_source_visuals = max(1, math.ceil(len(self.slides) * 0.35))
+        if source_visual_count > max_source_visuals:
+            raise ValueError("Too many source visuals; use them sparingly to avoid visual clutter.")
         return self
 
 
@@ -311,13 +378,16 @@ def _generate_deck(
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.25,
-                max_output_tokens=6500,
+                max_output_tokens=MAX_DECK_OUTPUT_TOKENS,
                 response_mime_type="application/json",
+                response_schema=SlideDeckPayload,
             ),
         )
         try:
-            payload = _parse_json_object(str(response.text or ""))
-            return SlideDeckPayload.model_validate(payload)
+            parsed_payload = _parsed_response_payload(response)
+            if isinstance(parsed_payload, SlideDeckPayload):
+                return parsed_payload
+            return SlideDeckPayload.model_validate(parsed_payload)
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             last_error = exc
             retry_feedback = (
@@ -338,14 +408,14 @@ def _deck_prompt(context: str, document_names: list[str], visual_candidates: lis
     visual_text = "\n".join(candidate_lines) if candidate_lines else "- none"
 
     return f"""
-You are creating a NotebookLM-style academic summary presentation.
+You are creating a NotebookLM-style academic presentation.
 
 Use only the supplied context. Auto-detect the main language from the context and write slide text in that language.
 
 Goal:
 - This is a presentation, not a document dump.
 - Choose the smallest useful number of slides between {MIN_SLIDES} and {MAX_SLIDES}.
-- Keep only core keywords, claims, methods, findings, comparisons, and takeaways.
+- Keep only core keywords, claims, methods, findings, comparisons, and implications.
 - Prefer fewer slides and sharper wording over exhaustive coverage.
 
 Allowed layout_type values:
@@ -355,15 +425,26 @@ Allowed layout_type values:
 - THREE_FEATURES
 - BIG_STAT
 - FIGURE_FOCUS
-- SUMMARY
+- SECTION_DIVIDER
+- HIGHLIGHT_CARD
+- TIMELINE
 
 Strict rules:
 - Return only valid JSON.
+- The JSON must match the response schema exactly; do not wrap it in markdown.
+- Escape any quotation marks inside string values, or omit them.
 - slide_count must equal the number of slides and must be between {MIN_SLIDES} and {MAX_SLIDES}.
 - Each slide must be at most {MAX_WORDS_PER_SLIDE} visible words total.
 - Each slide may have at most {MAX_BULLETS_PER_SLIDE} bullets.
 - Each bullet must be at most {MAX_WORDS_PER_BULLET} words.
 - Do not use the same layout_type more than 2 times consecutively.
+- Do not use KEY_BULLETS more than 2 times consecutively.
+- Use visual variety: prefer THREE_FEATURES, TWO_COLUMNS, BIG_STAT, HIGHLIGHT_CARD, TIMELINE, and SECTION_DIVIDER over plain bullets.
+- If the context has distinct major topics, insert a SECTION_DIVIDER before switching topics.
+- Do not create a final generic summary/recap/conclusion slide. Avoid slide titles like "Tóm tắt", "Summary", "Recap", or "Conclusion".
+- Never reuse the same source visual/page on multiple slides.
+- Use at most 1 source visual for every 3 slides; skip visuals that are dense, text-heavy, or only loosely related.
+- Put visuals only on TITLE, FIGURE_FOCUS, or HIGHLIGHT_CARD slides.
 - Do not include citation markers, source markers, footnotes, or bracket references like [1].
 - If an idea is too long, shorten it or drop secondary details. Do not add slides just to carry more text.
 - Use visual.kind "source_page" only when a supplied visual candidate clearly supports the slide.
@@ -398,6 +479,9 @@ For TWO_COLUMNS, content should use keys: left_title, right_title, left, right.
 For THREE_FEATURES, content should use key features as a list of objects with title and text.
 For BIG_STAT, content should use keys: stat, label, context.
 For FIGURE_FOCUS, content should use keys: caption, takeaway.
+For SECTION_DIVIDER, use title and subtitle only; bullets must be empty.
+For HIGHLIGHT_CARD, content should use keys: label, context, takeaway.
+For TIMELINE, content should use key steps as a list of 3-4 objects with title and text.
 
 Selected documents: {", ".join(document_names)}
 
@@ -547,7 +631,7 @@ def _render_pdf_page_data_url(pdf_path: Path, page_number: int) -> str | None:
         if page_index >= len(pdf):
             page_index = 0
         page = pdf[page_index]
-        bitmap = page.render(scale=1.5)
+        bitmap = page.render(scale=2.4)
         image = bitmap.to_pil().convert("RGB")
         return _image_to_data_url(image)
     except Exception:
@@ -583,11 +667,11 @@ def _generate_image_data_url(genai_client: genai.Client, image_model: str, promp
     return None
 
 
-def _image_to_data_url(image: Image.Image, max_size: tuple[int, int] = (980, 552)) -> str:
+def _image_to_data_url(image: Image.Image, max_size: tuple[int, int] = (1800, 1012)) -> str:
     image = image.copy()
     image.thumbnail(max_size, Image.Resampling.LANCZOS)
     buffer = io.BytesIO()
-    image.save(buffer, format="JPEG", quality=78, optimize=True)
+    image.save(buffer, format="JPEG", quality=88, optimize=True)
     return "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
 
 
@@ -599,12 +683,12 @@ def _render_deck_pdf(deck: dict[str, Any], pdf_path: Path) -> None:
 
     rendered = [_render_slide(deck, slide if isinstance(slide, dict) else {}) for slide in slides]
     first_image, *rest = rendered
-    first_image.save(pdf_path, "PDF", resolution=144, save_all=True, append_images=rest)
+    first_image.save(pdf_path, "PDF", resolution=288, save_all=True, append_images=rest)
 
 
 def _render_slide(deck: dict[str, Any], slide: dict[str, Any]) -> Image.Image:
-    image = Image.new("RGB", (SLIDE_WIDTH, SLIDE_HEIGHT), "#f7fafb")
-    draw = ImageDraw.Draw(image)
+    image = Image.new("RGB", (SLIDE_WIDTH * PDF_RENDER_SCALE, SLIDE_HEIGHT * PDF_RENDER_SCALE), "#f7fafb")
+    draw = _ScaledDraw(ImageDraw.Draw(image), PDF_RENDER_SCALE)
     title_font = _font(58, bold=True)
     subtitle_font = _font(34)
     heading_font = _font(34, bold=True)
@@ -629,7 +713,10 @@ def _render_slide(deck: dict[str, Any], slide: dict[str, Any]) -> Image.Image:
             _paste_visual(image, visual_image, (360, 450, 1240, 720), rounded=False)
         else:
             _draw_waveform(draw, (315, 470, 1285, 730))
-        _draw_footer(draw, deck, small_font)
+        return image
+
+    if layout == "SECTION_DIVIDER":
+        _render_section_divider(draw, title, subtitle, title_font, subtitle_font)
         return image
 
     _draw_wrapped(draw, title, (95, 75), heading_font, "#1f5666", max_width=980, line_gap=6)
@@ -644,13 +731,65 @@ def _render_slide(deck: dict[str, Any], slide: dict[str, Any]) -> Image.Image:
         _render_big_stat(draw, slide, title_font, body_font, small_font)
     elif layout == "FIGURE_FOCUS":
         _render_figure_focus(image, draw, slide, visual_image, body_font, small_font)
+    elif layout == "HIGHLIGHT_CARD":
+        _render_highlight_card(image, draw, slide, visual_image, title_font, body_font, small_font)
+    elif layout == "TIMELINE":
+        _render_timeline(draw, slide, body_font, small_font)
+    elif layout == "SUMMARY":
+        _render_summary(draw, slide, body_font, small_font)
     else:
         _render_bullets(draw, slide, body_font)
 
-    if layout != "FIGURE_FOCUS" and visual_image:
-        _paste_visual(image, visual_image, (1000, 210, 1485, 695))
-    _draw_footer(draw, deck, small_font)
     return image
+
+
+class _ScaledDraw:
+    """Draw in logical slide units while rendering to a high-resolution canvas."""
+
+    def __init__(self, draw: ImageDraw.ImageDraw, scale: int):
+        self._draw = draw
+        self.scale = scale
+
+    def rectangle(self, xy: Any, **kwargs: Any) -> None:
+        self._draw.rectangle(self._scale_sequence(xy), **self._scale_kwargs(kwargs))
+
+    def rounded_rectangle(self, xy: Any, **kwargs: Any) -> None:
+        self._draw.rounded_rectangle(self._scale_sequence(xy), **self._scale_kwargs(kwargs))
+
+    def text(self, xy: tuple[float, float], text: str, **kwargs: Any) -> None:
+        self._draw.text(self._scale_point(xy), text, **kwargs)
+
+    def ellipse(self, xy: Any, **kwargs: Any) -> None:
+        self._draw.ellipse(self._scale_sequence(xy), **self._scale_kwargs(kwargs))
+
+    def line(self, xy: Any, **kwargs: Any) -> None:
+        self._draw.line(self._scale_sequence(xy), **self._scale_kwargs(kwargs))
+
+    def textbbox(self, xy: tuple[float, float], text: str, **kwargs: Any) -> tuple[int, int, int, int]:
+        bbox = self._draw.textbbox(self._scale_point(xy), text, **kwargs)
+        return tuple(int(round(value / self.scale)) for value in bbox)
+
+    def textlength(self, text: str, **kwargs: Any) -> float:
+        return self._draw.textlength(text, **kwargs) / self.scale
+
+    def _scale_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        scaled = dict(kwargs)
+        for key in ("radius", "width"):
+            if key in scaled and scaled[key] is not None:
+                scaled[key] = max(1, int(round(float(scaled[key]) * self.scale)))
+        return scaled
+
+    def _scale_point(self, point: tuple[float, float]) -> tuple[int, int]:
+        return (int(round(point[0] * self.scale)), int(round(point[1] * self.scale)))
+
+    def _scale_sequence(self, value: Any) -> Any:
+        if isinstance(value, list):
+            return [self._scale_sequence(item) for item in value]
+        if isinstance(value, tuple) and value and isinstance(value[0], (list, tuple)):
+            return tuple(self._scale_sequence(item) for item in value)
+        if isinstance(value, tuple):
+            return tuple(int(round(float(item) * self.scale)) for item in value)
+        return value
 
 
 def _render_bullets(draw: ImageDraw.ImageDraw, slide: dict[str, Any], body_font: ImageFont.ImageFont) -> None:
@@ -661,6 +800,40 @@ def _render_bullets(draw: ImageDraw.ImageDraw, slide: dict[str, Any], body_font:
     for bullet in bullets[:4]:
         draw.ellipse((112, y + 12, 124, y + 24), fill="#d89c2b")
         y = _draw_wrapped(draw, bullet, (148, y), body_font, "#2b3437", max_width=790, line_gap=8) + 22
+
+
+def _render_section_divider(
+    draw: ImageDraw.ImageDraw,
+    title: str,
+    subtitle: str,
+    title_font: ImageFont.ImageFont,
+    subtitle_font: ImageFont.ImageFont,
+) -> None:
+    draw.rectangle((0, 0, SLIDE_WIDTH, SLIDE_HEIGHT), fill="#1f5666")
+    draw.rectangle((0, 0, 42, SLIDE_HEIGHT), fill="#d89c2b")
+    draw.line((150, 218, 420, 218), fill="#d89c2b", width=8)
+    _draw_wrapped(draw, title, (150, 270), title_font, "#ffffff", max_width=1060, line_gap=12)
+    if subtitle:
+        _draw_wrapped(draw, subtitle, (154, 455), subtitle_font, "#dce9ed", max_width=980, line_gap=9)
+
+
+def _render_summary(
+    draw: ImageDraw.ImageDraw,
+    slide: dict[str, Any],
+    body_font: ImageFont.ImageFont,
+    small_font: ImageFont.ImageFont,
+) -> None:
+    bullets = [str(item) for item in slide.get("bullets", []) if str(item).strip()]
+    if not bullets:
+        bullets = [text for text in _visible_strings(slide.get("content", {}))[:3]]
+    boxes = [(120, 255, 500, 650), (610, 255, 990, 650), (1100, 255, 1480, 650)]
+    for index, item in enumerate(bullets[:3]):
+        box = boxes[index]
+        x1, y1, _x2, _y2 = box
+        draw.rounded_rectangle(box, radius=22, fill="#ffffff", outline="#d9e2e6", width=2)
+        draw.ellipse((x1 + 34, y1 + 34, x1 + 82, y1 + 82), fill="#d89c2b")
+        draw.text((x1 + 50, y1 + 43), str(index + 1), font=small_font, fill="#ffffff")
+        _draw_wrapped(draw, item, (x1 + 36, y1 + 128), body_font, "#1f5666", max_width=300, line_gap=8)
 
 
 def _render_two_columns(
@@ -698,6 +871,33 @@ def _render_three_features(
         _draw_wrapped(draw, str(feature.get("text") or ""), (x1 + 35, y1 + 190), small_font, "#2b3437", 305, 6)
 
 
+def _render_timeline(
+    draw: ImageDraw.ImageDraw,
+    slide: dict[str, Any],
+    body_font: ImageFont.ImageFont,
+    small_font: ImageFont.ImageFont,
+) -> None:
+    content = slide.get("content") if isinstance(slide.get("content"), dict) else {}
+    steps = content.get("steps") if isinstance(content.get("steps"), list) else []
+    if not steps:
+        steps = [{"title": f"Step {index + 1}", "text": text} for index, text in enumerate(_visible_strings(content)[:4])]
+    steps = steps[:4]
+    if not steps:
+        return
+
+    y_line = 430
+    draw.line((165, y_line, 1435, y_line), fill="#c7d5da", width=5)
+    slot_width = 1270 / max(len(steps) - 1, 1)
+    for index, step in enumerate(steps):
+        item = step if isinstance(step, dict) else {}
+        x = int(165 + slot_width * index)
+        draw.ellipse((x - 24, y_line - 24, x + 24, y_line + 24), fill="#1f5666")
+        draw.text((x - 10, y_line - 15), str(index + 1), font=small_font, fill="#ffffff")
+        text_x = max(95, min(x - 130, 1335))
+        _draw_wrapped(draw, str(item.get("title") or ""), (text_x, y_line + 62), body_font, "#1f5666", 260, 6)
+        _draw_wrapped(draw, str(item.get("text") or ""), (text_x, y_line + 140), small_font, "#2b3437", 260, 6)
+
+
 def _render_big_stat(
     draw: ImageDraw.ImageDraw,
     slide: dict[str, Any],
@@ -731,6 +931,38 @@ def _render_figure_focus(
     _draw_wrapped(draw, str(content.get("takeaway") or ""), (995, 430), small_font, "#2b3437", 420, 7)
 
 
+def _render_highlight_card(
+    image: Image.Image,
+    draw: ImageDraw.ImageDraw,
+    slide: dict[str, Any],
+    visual_image: Image.Image | None,
+    title_font: ImageFont.ImageFont,
+    body_font: ImageFont.ImageFont,
+    small_font: ImageFont.ImageFont,
+) -> None:
+    content = slide.get("content") if isinstance(slide.get("content"), dict) else {}
+    if visual_image:
+        card = (95, 235, 910, 690)
+        text_x = 985
+        text_width = 420
+        _paste_visual(image, visual_image, card)
+    else:
+        card = (140, 235, 1460, 680)
+        text_x = 220
+        text_width = 1060
+        draw.rounded_rectangle(card, radius=26, fill="#ffffff", outline="#d9e2e6", width=2)
+
+    label = str(content.get("label") or slide.get("title") or "")
+    context = str(content.get("context") or "")
+    takeaway = str(content.get("takeaway") or "")
+    draw.text((text_x, 275), label, font=small_font, fill="#d89c2b")
+    _draw_wrapped(draw, str(slide.get("title") or ""), (text_x, 330), title_font, "#1f5666", text_width, 10)
+    if context:
+        _draw_wrapped(draw, context, (text_x, 490), body_font, "#2b3437", text_width, 8)
+    if takeaway:
+        _draw_wrapped(draw, takeaway, (text_x, 615), small_font, "#586064", text_width, 7)
+
+
 def _draw_column_items(
     draw: ImageDraw.ImageDraw,
     items: list[str],
@@ -754,12 +986,6 @@ def _draw_slide_number(draw: ImageDraw.ImageDraw, number: Any, font: ImageFont.I
         draw.text((1500, 70), str(number), font=font, fill="#819097")
 
 
-def _draw_footer(draw: ImageDraw.ImageDraw, deck: dict[str, Any], font: ImageFont.ImageFont) -> None:
-    source_count = deck.get("source_count")
-    label = f"Based on {source_count} source{'s' if source_count != 1 else ''}" if source_count else ""
-    draw.text((95, 820), label, font=font, fill="#819097")
-
-
 def _draw_waveform(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int]) -> None:
     x1, y1, x2, y2 = box
     mid = (y1 + y2) / 2
@@ -776,7 +1002,7 @@ def _draw_waveform(draw: ImageDraw.ImageDraw, box: tuple[int, int, int, int]) ->
 
 
 def _paste_visual(image: Image.Image, visual: Image.Image, box: tuple[int, int, int, int], rounded: bool = True) -> None:
-    x1, y1, x2, y2 = box
+    x1, y1, x2, y2 = _scaled_box(box)
     target_w = x2 - x1
     target_h = y2 - y1
     visual = visual.copy().convert("RGB")
@@ -786,7 +1012,11 @@ def _paste_visual(image: Image.Image, visual: Image.Image, box: tuple[int, int, 
     image.paste(visual, (paste_x, paste_y))
     if rounded:
         draw = ImageDraw.Draw(image)
-        draw.rounded_rectangle(box, radius=18, outline="#d9e2e6", width=3)
+        draw.rounded_rectangle((x1, y1, x2, y2), radius=18 * PDF_RENDER_SCALE, outline="#d9e2e6", width=3 * PDF_RENDER_SCALE)
+
+
+def _scaled_box(box: tuple[int, int, int, int]) -> tuple[int, int, int, int]:
+    return tuple(int(round(value * PDF_RENDER_SCALE)) for value in box)
 
 
 def _decode_data_url(data_url: str) -> Image.Image | None:
@@ -800,6 +1030,7 @@ def _decode_data_url(data_url: str) -> Image.Image | None:
 
 
 def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
+    scaled_size = max(1, int(round(size * PDF_RENDER_SCALE)))
     paths = [
         "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf" if bold else "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
         "/System/Library/Fonts/Supplemental/Arial Bold.ttf" if bold else "/System/Library/Fonts/Supplemental/Arial.ttf",
@@ -807,8 +1038,8 @@ def _font(size: int, bold: bool = False) -> ImageFont.ImageFont:
     ]
     for path in paths:
         if Path(path).exists():
-            return ImageFont.truetype(path, size=size)
-    return ImageFont.load_default(size=size)
+            return ImageFont.truetype(path, size=scaled_size)
+    return ImageFont.load_default(size=scaled_size)
 
 
 def _draw_wrapped(
@@ -882,6 +1113,18 @@ def _parse_json_object(value: str) -> dict[str, Any]:
     return parsed
 
 
+def _parsed_response_payload(response: Any) -> dict[str, Any] | SlideDeckPayload:
+    parsed = getattr(response, "parsed", None)
+    if isinstance(parsed, SlideDeckPayload):
+        return parsed
+    if isinstance(parsed, BaseModel):
+        return parsed.model_dump()
+    if isinstance(parsed, dict):
+        return parsed
+
+    return _parse_json_object(str(getattr(response, "text", "") or ""))
+
+
 def _visible_strings(value: Any) -> list[str]:
     if value is None:
         return []
@@ -905,6 +1148,12 @@ def _visible_strings(value: Any) -> list[str]:
 
 def _word_count(text: str) -> int:
     return len([part for part in re.split(r"\s+", text.strip()) if part])
+
+
+def _normalized_label(text: str) -> str:
+    normalized = unicodedata.normalize("NFKD", text)
+    ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
+    return re.sub(r"\s+", " ", ascii_text.casefold()).strip()
 
 
 def _first_page_from_range(value: Any) -> int | None:
