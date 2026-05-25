@@ -23,6 +23,10 @@ pdf:
   describe_images: true
   image_caption_model: "gemini-2.5-flash"
 
+# Slide Deck Generation
+slide_deck:
+  image_model: "gemini-2.5-flash-image"
+
 # Chunking Configuration
 chunking:
   strategy: "semantic"  # semantic, fixed, recursive

@@ -8,11 +8,12 @@ import { SynthesisCard } from '../components/chat/SynthesisCard'
 import { ChatComposer } from '../components/chat/ChatComposer'
 import { ChatMessageList, RichAnswerContent } from '../components/chat/ChatMessageList'
 import { AudioOverviewPlayer, type AudioPlaybackState } from '../components/history/AudioOverviewPlayer'
+import { SlideDeckViewer } from '../components/history/SlideDeckViewer'
 import { StudioDocumentsPanel } from '../components/history/StudioDocumentsPanel'
 import { useChatManager } from '../hooks/useChatManager'
 import { useDocuments } from '../hooks/useDocuments'
 import { useAuth } from '../hooks/useAuth'
-import type { AudioOverviewDocument, SourceItem, StudioNoteDocument } from '../types'
+import type { AudioOverviewDocument, SlideDeckDocument, SourceItem, StudioNoteDocument } from '../types'
 
 export function NotebookEditorPage() {
   const { notebookId = '' } = useParams()
@@ -26,6 +27,7 @@ export function NotebookEditorPage() {
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
   const [savingNoteId, setSavingNoteId] = useState<string | null>(null)
   const [creatingAudio, setCreatingAudio] = useState(false)
+  const [creatingSlides, setCreatingSlides] = useState(false)
   const [noteError, setNoteError] = useState<string | null>(null)
   const [editingTitle, setEditingTitle] = useState(false)
   const [titleDraft, setTitleDraft] = useState('')
@@ -46,6 +48,9 @@ export function NotebookEditorPage() {
     createAudioOverview,
     deleteAudioOverview,
     refreshAudioOverviewUrl,
+    createSlideDeck,
+    deleteSlideDeck,
+    refreshSlideDeckPdfUrl,
     error: documentError,
   } = useDocuments(notebookId)
   const { messages, isPending, error: chatError, sendMessage, newChat, saveNote } = useChatManager(notebookId)
@@ -287,6 +292,53 @@ export function NotebookEditorPage() {
     }
   }
 
+  const handleCreateSlideDeck = async () => {
+    if (!selectedSourceNames.length || creatingSlides) {
+      return
+    }
+
+    setCreatingSlides(true)
+    setNoteError(null)
+    try {
+      await createSlideDeck(selectedSourceNames)
+    } catch (err) {
+      setNoteError((err as Error).message)
+    } finally {
+      setCreatingSlides(false)
+    }
+  }
+
+  const handleDeleteSlideDeck = async (document: SlideDeckDocument) => {
+    if (!window.confirm(`Delete presentation "${document.title}"?`)) {
+      return
+    }
+
+    setNoteError(null)
+    try {
+      await deleteSlideDeck(document.id)
+      setActiveItemId((current) => (current === document.id ? null : current))
+    } catch (err) {
+      setNoteError((err as Error).message)
+    }
+  }
+
+  const handleRetrySlideDeck = async (document: SlideDeckDocument) => {
+    const documentNames = document.documentNames.length ? document.documentNames : selectedSourceNames
+    if (!documentNames.length || creatingSlides) {
+      return
+    }
+
+    setCreatingSlides(true)
+    setNoteError(null)
+    try {
+      await createSlideDeck(documentNames)
+    } catch (err) {
+      setNoteError((err as Error).message)
+    } finally {
+      setCreatingSlides(false)
+    }
+  }
+
   const handleSendMessage = (input: string) => {
     void sendMessage(input, selectedSourceNames)
   }
@@ -442,6 +494,9 @@ export function NotebookEditorPage() {
               onCreateAudioOverview={() => {
                 void handleCreateAudioOverview()
               }}
+              onCreateSlideDeck={() => {
+                void handleCreateSlideDeck()
+              }}
               onRenameNote={(document) => {
                 void handleRenameNote(document)
               }}
@@ -454,6 +509,12 @@ export function NotebookEditorPage() {
               onRetryAudioOverview={(document) => {
                 void handleRetryAudioOverview(document)
               }}
+              onDeleteSlideDeck={(document) => {
+                void handleDeleteSlideDeck(document)
+              }}
+              onRetrySlideDeck={(document) => {
+                void handleRetrySlideDeck(document)
+              }}
               onRefreshAudioUrl={(document) => refreshAudioOverviewUrl(document.id)}
               audioPlaybackById={audioPlaybackById}
               activeAudioPlayerId={activeAudioPlayerId}
@@ -461,6 +522,8 @@ export function NotebookEditorPage() {
               onActiveAudioPlayerChange={setActiveAudioPlayerId}
               audioDisabled={!selectedSourceNames.length}
               audioBusy={creatingAudio}
+              presentationDisabled={!selectedSourceNames.length}
+              presentationBusy={creatingSlides}
             />
           </div>
         </div>
@@ -480,11 +543,19 @@ export function NotebookEditorPage() {
 
       {activeItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-[rgba(12,15,16,0.25)] px-4 py-8 backdrop-blur-[3px]">
-          <article className="max-h-[86vh] w-full max-w-[760px] overflow-y-auto rounded-[14px] bg-white shadow-[0_24px_80px_rgba(43,52,55,0.2)]">
+          <article
+            className={`max-h-[86vh] w-full overflow-y-auto rounded-[14px] bg-white shadow-[0_24px_80px_rgba(43,52,55,0.2)] ${
+              activeItem.itemType === 'slide_deck' ? 'max-w-[1180px]' : 'max-w-[760px]'
+            }`}
+          >
             <div className="sticky top-0 flex items-start justify-between gap-4 border-b border-black/8 bg-white px-6 py-4">
               <div>
                 <div className="text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-muted">
-                  {activeItem.itemType === 'audio_overview' ? 'Audio Overview' : 'Saved Note'}
+                  {activeItem.itemType === 'audio_overview'
+                    ? 'Audio Overview'
+                    : activeItem.itemType === 'slide_deck'
+                    ? 'Presentation'
+                    : 'Saved Note'}
                 </div>
                 <h2 className="mt-1 text-[1.2rem] font-medium leading-7 text-ink">{activeItem.title}</h2>
               </div>
@@ -537,6 +608,11 @@ export function NotebookEditorPage() {
                     </section>
                   )}
                 </>
+              ) : activeItem.itemType === 'slide_deck' ? (
+                <SlideDeckViewer
+                  document={activeItem}
+                  onRefreshPdfUrl={(document) => refreshSlideDeckPdfUrl(document.id)}
+                />
               ) : (
                 <>
                   {activeItem.question && (

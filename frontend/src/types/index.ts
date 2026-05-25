@@ -3,6 +3,15 @@ export type AuthFormMode = 'login' | 'signup' | 'forgot-password'
 export type SourceKind = 'pdf' | 'docx' | 'txt'
 export type DocumentStatusValue = 'pending' | 'processing' | 'completed' | 'failed'
 export type AudioOverviewStatusValue = 'pending' | 'processing' | 'completed' | 'failed'
+export type SlideDeckStatusValue = 'pending' | 'processing' | 'completed' | 'failed'
+export type SlideLayoutType =
+  | 'TITLE'
+  | 'KEY_BULLETS'
+  | 'TWO_COLUMNS'
+  | 'THREE_FEATURES'
+  | 'BIG_STAT'
+  | 'FIGURE_FOCUS'
+  | 'SUMMARY'
 
 export interface UserProfile {
   id: string
@@ -32,7 +41,7 @@ export interface SourceItem {
 
 interface BaseStudioDocument {
   id: string
-  itemType: 'note' | 'audio_overview'
+  itemType: 'note' | 'audio_overview' | 'slide_deck'
   title: string
   excerpt: string
   updatedAt: string
@@ -63,7 +72,49 @@ export interface AudioOverviewDocument extends BaseStudioDocument {
   audioUrlExpiresAt?: number | null
 }
 
-export type StudioDocument = StudioNoteDocument | AudioOverviewDocument
+export interface SlideVisual {
+  kind?: 'none' | 'source_page' | 'generated_image'
+  prompt?: string | null
+  source_index?: number | null
+  page?: number | null
+  alt?: string | null
+  data_url?: string | null
+}
+
+export interface SlideDeckSlide {
+  slide_number: number
+  layout_type: SlideLayoutType
+  title: string
+  subtitle?: string | null
+  bullets?: string[]
+  content?: Record<string, unknown>
+  visual?: SlideVisual
+}
+
+export interface SlideDeckJson {
+  title: string
+  language?: string | null
+  slide_count: number
+  slides: SlideDeckSlide[]
+  source_count?: number
+  image_generation_count?: number
+}
+
+export interface SlideDeckDocument extends BaseStudioDocument {
+  itemType: 'slide_deck'
+  icon: 'presentation'
+  status: SlideDeckStatusValue
+  deckJson?: SlideDeckJson | null
+  documentNames: string[]
+  sourceCount: number
+  storagePath?: string | null
+  contentType?: string | null
+  errorMessage?: string | null
+  pdfUrl?: string | null
+  pdfUrlExpiresAt?: number | null
+}
+
+export type StudioDocument = StudioNoteDocument | AudioOverviewDocument | SlideDeckDocument
 
 export interface ChatMessage {
   id: string
@@ -143,6 +194,26 @@ export interface BackendAudioOverview {
 
 export interface BackendAudioOverviewUrl {
   audio_url: string
+  expires_in: number
+}
+
+export interface BackendSlideDeck {
+  id: string
+  notebook_id: string
+  status: SlideDeckStatusValue
+  storage_path: string | null
+  title: string
+  deck_json: SlideDeckJson | null
+  document_names: string[]
+  source_count: number
+  content_type: string | null
+  error_message: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface BackendSlideDeckUrl {
+  pdf_url: string
   expires_in: number
 }
 

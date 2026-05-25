@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     libreoffice-writer \
     ffmpeg \
     poppler-utils \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -r appuser && useradd -r -g appuser -m -d /home/appuser appuser
@@ -34,4 +35,4 @@ USER appuser
 CMD ["uv", "run", "celery", "-A", "app.workers.celery_app", "worker", \
      "--loglevel=info", \
      "--concurrency=2", \
-     "-Q", "document_processing,embedding,storage,audio_overviews"]
+     "-Q", "document_processing,embedding,storage,audio_overviews,slides"]

@@ -100,11 +100,18 @@ class RAGConfig(BaseModel):
     reranking: RerankingConfig
 
 
+class SlideDeckConfig(BaseModel):
+    """Slide deck generation settings."""
+
+    image_model: str
+
+
 class AppConfig(BaseModel):
     """Application configuration from YAML."""
 
     llm: LLMSettings
     pdf: PDFConfig
+    slide_deck: SlideDeckConfig
     chunking: ChunkingConfig
     vector_db: VectorDBConfig
     rag: RAGConfig
@@ -136,6 +143,7 @@ class Settings(BaseSettings):
         default=150,
         description="Minimum rendered audio overview duration in seconds",
     )
+    slide_deck_bucket: str = Field(default="slide-decks", description="Supabase Storage bucket for slide deck PDFs")
     datn_require_worker_mode: bool = Field(
         default=False,
         description="Fail startup unless document processing is configured for Celery worker mode",
