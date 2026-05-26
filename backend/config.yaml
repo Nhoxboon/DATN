@@ -26,6 +26,11 @@ pdf:
 # Slide Deck Generation
 slide_deck:
   image_model: "gemini-2.5-flash-image"
+  pdf_renderer: "browser"
+  pdf_renderer_fallback: "pillow"
+  browser_render_timeout_seconds: 30
+  browser_max_retries: 2
+  browser_screenshot_scale: 2
 
 # Chunking Configuration
 chunking:

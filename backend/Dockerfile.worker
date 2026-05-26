@@ -20,9 +20,11 @@ RUN groupadd -r appuser && useradd -r -g appuser -m -d /home/appuser appuser
 RUN pip install --no-cache-dir uv
 ENV UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu121
 ENV PYTHONUNBUFFERED=1
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
+RUN uv run playwright install --with-deps chromium && chmod -R 755 /ms-playwright
 
 COPY app ./app
 COPY config.yaml ./

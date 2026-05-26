@@ -114,6 +114,7 @@ services:
       - ./app:/app/app
       - ./config.yaml:/app/config.yaml:ro
       - ./models:/app/models:ro
+      - ../frontend/dist:/app/slide-renderer:ro
       - datn-uploads:/app/uploads
     networks:
       - datn-network

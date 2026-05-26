@@ -40,6 +40,7 @@ export default defineConfig(({ mode }) => {
     'http://localhost:8000'
 
   return {
+    base: './',
     define: {
       'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(supabaseUrl),
       'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(supabaseAnonKey),
@@ -51,5 +52,13 @@ export default defineConfig(({ mode }) => {
       babel({ presets: [reactCompilerPreset()] }),
       tailwindcss(),
     ],
+    build: {
+      rollupOptions: {
+        input: {
+          app: resolve(frontendRoot, 'index.html'),
+          'slide-renderer': resolve(frontendRoot, 'slide-renderer.html'),
+        },
+      },
+    },
   }
 })

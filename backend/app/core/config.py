@@ -104,6 +104,11 @@ class SlideDeckConfig(BaseModel):
     """Slide deck generation settings."""
 
     image_model: str
+    pdf_renderer: str = "browser"
+    pdf_renderer_fallback: str = "pillow"
+    browser_render_timeout_seconds: int = 30
+    browser_max_retries: int = 2
+    browser_screenshot_scale: float = 2
 
 
 class AppConfig(BaseModel):

@@ -5,6 +5,15 @@ export type DocumentStatusValue = 'pending' | 'processing' | 'completed' | 'fail
 export type AudioOverviewStatusValue = 'pending' | 'processing' | 'completed' | 'failed'
 export type SlideDeckStatusValue = 'pending' | 'processing' | 'completed' | 'failed'
 export type SlideLayoutType =
+  | 'TITLE_HERO'
+  | 'DUAL_PILLARS'
+  | 'GRID_COMPOSITE'
+  | 'PROCESS_FLOW_WITH_CALLOUT'
+  | 'VISUAL_ANCHOR'
+  | 'METRIC_DASHBOARD'
+  | 'CODE_COMPARISON'
+  | 'CHECKLIST'
+  | 'TRANSITION'
   | 'TITLE'
   | 'KEY_BULLETS'
   | 'TWO_COLUMNS'
@@ -15,6 +24,34 @@ export type SlideLayoutType =
   | 'HIGHLIGHT_CARD'
   | 'TIMELINE'
   | 'SUMMARY'
+
+export type SlideIconKey =
+  | 'cpu'
+  | 'globe'
+  | 'gauge'
+  | 'database'
+  | 'layers'
+  | 'box'
+  | 'route'
+  | 'workflow'
+  | 'warning'
+  | 'check'
+  | 'rocket'
+  | 'zap'
+  | 'code'
+  | 'palette'
+  | 'gamepad'
+  | 'package'
+  | 'server'
+  | 'shield'
+  | 'search'
+  | 'list-checks'
+  | 'repeat'
+  | 'timer'
+  | 'network'
+
+export type SlideCardTag = 'LEGACY' | 'MID_LEVEL' | 'RECOMMENDED' | 'WARNING' | 'INSIGHT' | 'DEFAULT'
+export type SlideCalloutType = 'WARNING' | 'INSIGHT' | 'RECOMMENDED'
 
 export interface UserProfile {
   id: string
@@ -84,12 +121,71 @@ export interface SlideVisual {
   data_url?: string | null
 }
 
+export interface SlideCardComponent {
+  id?: string
+  tag?: SlideCardTag
+  icon_key?: SlideIconKey
+  heading?: string
+  desc?: string
+}
+
+export interface SlideFlowStepComponent {
+  step?: string
+  label?: string
+  action?: string
+}
+
+export interface SlideCalloutComponent {
+  type?: SlideCalloutType
+  text?: string
+}
+
+export interface SlideMetricComponent {
+  icon_key?: SlideIconKey
+  value?: string
+  label?: string
+  context?: string
+}
+
+export interface SlideComparisonComponent {
+  label?: string
+  left?: string
+  right?: string
+}
+
+export interface SlideChecklistComponent {
+  icon_key?: SlideIconKey
+  text?: string
+}
+
+export interface SlideVisualAnchorComponent {
+  kind?: 'none' | 'icon' | 'source_page' | 'generated_image'
+  icon_key?: SlideIconKey | null
+  caption?: string | null
+  prompt?: string | null
+  source_index?: number | null
+  page?: number | null
+  alt?: string | null
+  data_url?: string | null
+}
+
+export interface SlideComponents {
+  cards?: SlideCardComponent[]
+  flow_steps?: SlideFlowStepComponent[]
+  callout_box?: SlideCalloutComponent | null
+  metrics?: SlideMetricComponent[]
+  comparison?: SlideComparisonComponent[]
+  checklist?: SlideChecklistComponent[]
+  visual_anchor?: SlideVisualAnchorComponent
+}
+
 export interface SlideDeckSlide {
   slide_number: number
   layout_type: SlideLayoutType
   title: string
   subtitle?: string | null
   bullets?: string[]
+  components?: SlideComponents
   content?: Record<string, unknown>
   visual?: SlideVisual
 }
@@ -99,6 +195,7 @@ export interface SlideDeckJson {
   language?: string | null
   slide_count: number
   slides: SlideDeckSlide[]
+  story_outline?: unknown
   source_count?: number
   image_generation_count?: number
 }
