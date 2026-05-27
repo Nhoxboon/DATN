@@ -117,6 +117,34 @@ ICON_LABELS = {
     "timer": "TIME",
     "network": "NET",
 }
+DANGLING_TRAILING_WORDS = {
+    "and",
+    "or",
+    "to",
+    "with",
+    "via",
+    "through",
+    "by",
+    "for",
+    "in",
+    "on",
+    "of",
+    "tang",
+    "giam",
+    "va",
+    "hoac",
+    "de",
+    "bang",
+    "qua",
+    "voi",
+    "khi",
+    "khong",
+    "con",
+    "nhung",
+    "co",
+    "the",
+    "gay",
+}
 FINAL_SUMMARY_TITLES = {
     "tom tat",
     "tong ket",
@@ -866,6 +894,7 @@ Component rules:
 - GRID_COMPOSITE: 3 cards with id, tag, icon_key, heading, desc.
 - DUAL_PILLARS: 2 cards; each card must have icon_key, heading, desc.
 - PROCESS_FLOW_WITH_CALLOUT: 3-5 flow_steps and one callout_box.
+- flow_steps.step must be a numeric string only ("1", "2", "3"...); put words in label/action.
 - VISUAL_ANCHOR: components.visual_anchor must be icon, source_page, or generated_image and include a short caption.
 - METRIC_DASHBOARD: 3-5 metrics with icon_key, value, label, context.
 - CODE_COMPARISON: 2-4 comparison rows with label, left, right.
@@ -1413,7 +1442,7 @@ def _render_process_flow_with_callout(
         x = x_start + index * (step_width + gap)
         box = (x, y, x + step_width, y + 220)
         draw.rounded_rectangle(box, radius=18, fill="#ffffff", outline="#c7d5da", width=2)
-        draw.text((x + 22, y + 24), str(step.get("step") or index + 1), font=small_font, fill="#d89c2b")
+        draw.text((x + 22, y + 24), str(index + 1), font=small_font, fill="#d89c2b")
         _draw_wrapped(draw, str(step.get("label") or ""), (x + 22, y + 68), body_font, "#1f5666", max_width=220, line_gap=6)
         _draw_wrapped(draw, str(step.get("action") or ""), (x + 22, y + 145), small_font, "#2b3437", max_width=220, line_gap=5)
         if index < len(steps) - 1:
@@ -2203,6 +2232,7 @@ def _repair_flow_step_payload(step: dict[str, Any]) -> dict[str, Any]:
     action = _repair_action_text(str(step.get("action") or ""))
     return {
         **step,
+        "step": _normalize_flow_step_marker(step.get("step")),
         "label": _truncate_words(str(step.get("label") or ""), 5),
         "action": action,
     }
@@ -2261,8 +2291,38 @@ def _truncate_words(text: str, max_words: int) -> str:
         return ""
     words = [part for part in re.split(r"\s+", text.strip()) if part]
     if len(words) <= max_words:
-        return text.strip()
-    return " ".join(words[:max_words]).rstrip(" ,;:.") + "."
+        return _clean_dangling_text(text.strip())
+    return _clean_truncated_text(words[:max_words])
+
+
+def _clean_truncated_text(words: list[str]) -> str:
+    return _clean_dangling_words(words, add_period=True)
+
+
+def _clean_dangling_text(text: str) -> str:
+    words = [part for part in re.split(r"\s+", text.strip()) if part]
+    if not words:
+        return ""
+    return _clean_dangling_words(words, add_period=False)
+
+
+def _clean_dangling_words(words: list[str], *, add_period: bool) -> str:
+    removed = False
+    while len(words) > 1:
+        last = re.sub(r"[.,;:!?]+$", "", words[-1])
+        if _normalized_label(last) not in DANGLING_TRAILING_WORDS:
+            break
+        words.pop()
+        removed = True
+    cleaned = " ".join(words).rstrip(" ,;:.")
+    if add_period or removed:
+        return f"{cleaned}."
+    return cleaned
+
+
+def _normalize_flow_step_marker(value: Any) -> str:
+    match = re.search(r"\d+", str(value or ""))
+    return match.group(0) if match else ""
 
 
 def _visible_strings(value: Any) -> list[str]:
@@ -2279,7 +2339,7 @@ def _visible_strings(value: Any) -> list[str]:
     if isinstance(value, dict):
         strings = []
         for key, item in value.items():
-            if key in {"visual", "data_url", "source_index", "page", "prompt", "alt", "kind", "icon_key", "id"}:
+            if key in {"visual", "data_url", "source_index", "page", "prompt", "alt", "kind", "icon_key", "id", "step"}:
                 continue
             strings.extend(_visible_strings(item))
         return strings

@@ -26,6 +26,7 @@ from app.modules.slides.tasks import (
     _repair_deck_payload,
     _slide_visible_word_count,
     _render_deck_pdf_for_config,
+    _truncate_words,
     _visual_candidates,
     generate_slide_deck_task,
 )
@@ -429,7 +430,7 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
                     "PROCESS_FLOW_WITH_CALLOUT",
                     components={
                         "flow_steps": [
-                            {"step": "1", "label": "Game Start", "action": "Load settings"},
+                            {"step": "Game Start", "label": "Game Start", "action": "Load settings"},
                             {"step": "2", "label": "Select Locale", "action": "Thiết lập ngôn ngữ hệ thống"},
                             {"step": "3", "label": "Update UI", "action": "Cập nhật giao diện người dùng bằng dữ liệu bản dịch mới nhất."},
                         ],
@@ -461,7 +462,30 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
 
         self.assertEqual(deck.slide_count, 5)
         self.assertLessEqual(len(deck.slides[1].components.cards[0].desc.split()), 16)
+        self.assertEqual(deck.slides[2].components.flow_steps[0].step, "")
         self.assertEqual(deck.slides[2].components.flow_steps[2].action, "Cập nhật giao diện người dùng bằng dữ liệu bản dịch mới.")
+
+    def test_visible_word_count_ignores_flow_step_marker(self) -> None:
+        slide = _v2_slide(
+            1,
+            "PROCESS_FLOW_WITH_CALLOUT",
+            components={
+                "flow_steps": [
+                    {"step": "Game Start", "label": "Start", "action": "Load settings"},
+                    {"step": "Load Table", "label": "Table", "action": "Lazy load"},
+                    {"step": "Update UI", "label": "UI", "action": "Render text"},
+                ],
+                "callout_box": {"type": "INSIGHT", "text": "Keep memory stable."},
+            },
+        )
+
+        self.assertEqual(_slide_visible_word_count(slide), 15)
+
+    def test_truncate_words_drops_dangling_terminal_word(self) -> None:
+        text = "Tables lazy load qua Addressables, tiết kiệm bộ nhớ, tăng hiệu suất."
+
+        self.assertEqual(_truncate_words(text, 10), "Tables lazy load qua Addressables, tiết kiệm bộ nhớ.")
+        self.assertEqual(_truncate_words("GC tự động quản lý Heap nhưng có thể gây.", 12), "GC tự động quản lý Heap.")
 
     def test_repair_deck_payload_enforces_total_slide_word_budget(self) -> None:
         payload = {

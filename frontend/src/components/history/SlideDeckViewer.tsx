@@ -320,14 +320,20 @@ function ProcessFlowWithCallout({ slide }: { slide: SlideDeckSlide }) {
   const steps = slide.components?.flow_steps?.slice(0, 5) ?? []
   return (
     <div className="flex h-[78%] flex-col justify-center gap-6">
-      <div className="grid gap-3 md:grid-cols-5">
+      <div
+        className="grid gap-3"
+        style={{ gridTemplateColumns: `repeat(${Math.max(steps.length, 1)}, minmax(0, 1fr))` }}
+      >
         {steps.map((step, index) => (
-          <div key={`${slide.slide_number}-flow-${index}`} className="relative rounded-lg border border-[#d9e2e6] bg-white p-4">
-            <div className="mb-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#1f5666] text-[0.72rem] font-bold text-white">
-              {step.step || index + 1}
+          <div key={`${slide.slide_number}-flow-${index}`} className="relative min-w-0 rounded-lg border border-[#d9e2e6] bg-white p-4">
+            <div
+              className="mb-4 inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#1f5666] text-[0.72rem] font-bold leading-none text-white"
+              aria-label={step.step ? `Step ${step.step}` : `Step ${index + 1}`}
+            >
+              {index + 1}
             </div>
-            <h4 className="mb-2 text-[clamp(0.75rem,1.1vw,0.95rem)] font-bold leading-tight text-[#1f5666]">{step.label}</h4>
-            <p className="text-[clamp(0.62rem,0.95vw,0.78rem)] leading-snug text-[#2b3437]">{step.action}</p>
+            <h4 className="mb-2 text-[clamp(0.75rem,1.1vw,0.95rem)] font-bold leading-tight text-[#1f5666]">{cleanSlideText(step.label)}</h4>
+            <p className="text-[clamp(0.62rem,0.95vw,0.78rem)] leading-snug text-[#2b3437]">{cleanSlideText(step.action)}</p>
           </div>
         ))}
       </div>
@@ -441,9 +447,9 @@ function CalloutBox({ callout }: { callout: SlideCalloutComponent }) {
   return (
     <div className={`flex items-start gap-4 rounded-lg border px-5 py-4 ${style.shell}`}>
       <IconBadge iconKey={style.iconKey} className={style.icon} />
-      <div>
+      <div className="min-w-0">
         <div className={`mb-1 text-[0.68rem] font-bold uppercase tracking-[0.08em] ${style.label}`}>{callout.type || 'INSIGHT'}</div>
-        <p className={`text-[clamp(0.72rem,1.15vw,0.95rem)] font-semibold leading-snug ${style.text}`}>{callout.text}</p>
+        <p className={`text-[clamp(0.72rem,1.15vw,0.95rem)] font-semibold leading-snug ${style.text}`}>{cleanSlideText(callout.text)}</p>
       </div>
     </div>
   )
@@ -460,6 +466,57 @@ function IconBadge({ iconKey, className }: { iconKey: SlideIconKey | string; cla
 function SlideIcon({ iconKey, className }: { iconKey: SlideIconKey | string; className?: string }) {
   const Icon = ICON_MAP[iconKey as SlideIconKey] || CheckCircle2
   return <Icon className={className} />
+}
+
+const DANGLING_TRAILING_WORDS = new Set([
+  'and',
+  'or',
+  'to',
+  'with',
+  'via',
+  'through',
+  'by',
+  'for',
+  'in',
+  'on',
+  'of',
+  'tang',
+  'giam',
+  'va',
+  'hoac',
+  'de',
+  'bang',
+  'qua',
+  'voi',
+  'khi',
+  'khong',
+  'con',
+  'nhung',
+  'co',
+  'the',
+  'gay',
+])
+
+function cleanSlideText(text?: string | null) {
+  if (!text) {
+    return ''
+  }
+  const parts = text.trim().split(/\s+/)
+  let removedDanglingWord = false
+  while (parts.length > 1) {
+    const last = parts[parts.length - 1].replace(/[.,;:!?]+$/g, '')
+    if (!DANGLING_TRAILING_WORDS.has(normalizeTextToken(last))) {
+      break
+    }
+    parts.pop()
+    removedDanglingWord = true
+  }
+  const cleaned = parts.join(' ').replace(/\s+([.,;:!?])/g, '$1')
+  return removedDanglingWord ? `${cleaned.replace(/[ ,;:]+$/g, '')}.` : cleaned
+}
+
+function normalizeTextToken(text: string) {
+  return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
 }
 
 const ICON_MAP: Record<SlideIconKey, LucideIcon> = {
