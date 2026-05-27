@@ -55,6 +55,9 @@ def render_deck_pdf_with_browser(
             page = context.new_page()
             page.goto(html_path.as_uri(), wait_until="domcontentloaded", timeout=timeout_ms)
             page.wait_for_function("typeof window.renderSlideDeck === 'function'", timeout=timeout_ms)
+            renderer_version = page.evaluate("() => window.__SLIDE_RENDERER_VERSION__ || null")
+            if renderer_version:
+                deck["pdf_renderer_version"] = str(renderer_version)
             page.evaluate("deck => window.renderSlideDeck(deck)", deck)
             page.wait_for_function("window.__SLIDE_RENDER_READY__ === true", timeout=timeout_ms)
             page_count = page.locator(".slide-render-page").count()

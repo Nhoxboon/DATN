@@ -11,6 +11,8 @@ from unittest.mock import Mock, patch
 from uuid import uuid4
 import unittest
 
+from PIL import Image
+
 os.environ.setdefault("SUPABASE_URL", "https://example.supabase.co")
 os.environ.setdefault("SUPABASE_ANON_KEY", "anon-key")
 os.environ.setdefault("SUPABASE_SERVICE_KEY", "service-key")
@@ -21,9 +23,15 @@ from app.modules.slides.service import SlideDeckService, SlideDeckValidationErro
 from app.modules.slides.tasks import (
     SlideDeckPayload,
     StoryOutlinePayload,
+    _deck_prompt,
+    _choose_source_crop_box,
+    _expected_coverage_topics,
+    _fallback_story_outline,
+    _icon_grid_boxes,
     _materialize_visuals,
     _parse_json_object,
     _repair_deck_payload,
+    _review_deck_design,
     _slide_visible_word_count,
     _render_deck_pdf_for_config,
     _truncate_words,
@@ -49,8 +57,11 @@ def _v2_slide(index: int, layout: str, title: str | None = None, components: dic
     }
 
 
-def _card(card_id: str, heading: str = "Core", desc: str = "Short action cue") -> dict[str, str]:
-    return {"id": card_id, "tag": "INSIGHT", "icon_key": "cpu", "heading": heading, "desc": desc}
+def _card(card_id: str, heading: str = "Core", desc: str = "Short action cue", points: list[str] | None = None) -> dict[str, object]:
+    payload: dict[str, object] = {"id": card_id, "tag": "INSIGHT", "icon_key": "cpu", "heading": heading, "desc": desc}
+    if points is not None:
+        payload["points"] = points
+    return payload
 
 
 class FakeQuery:
@@ -271,6 +282,12 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
 
         self.assertEqual(payload["title"], "Deck")
 
+    def test_parse_json_object_repairs_missing_commas(self) -> None:
+        payload = _parse_json_object('{"title":"Deck"\n"slide_count":5,"slides":[{"slide_number":1}\n{"slide_number":2}]}')
+
+        self.assertEqual(payload["slide_count"], 5)
+        self.assertEqual(len(payload["slides"]), 2)
+
     def test_deck_validation_enforces_slide_count_and_concise_text(self) -> None:
         valid_slides = [
             _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "icon", "icon_key": "rocket", "caption": "Main idea"}}),
@@ -368,20 +385,28 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             StoryOutlinePayload.model_validate({"title": "Deck", "slide_count": 5, "chapters": ["Optimization", "Localization"], "slides": slides})
 
-    def test_deck_validation_rejects_missing_anchors_invalid_icon_and_bad_process_actions(self) -> None:
-        missing_anchors = [
+    def test_deck_validation_rejects_dual_pillar_overuse_invalid_icon_and_bad_process_actions(self) -> None:
+        base_slides = [
             _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "icon", "icon_key": "rocket", "caption": "Main idea"}}),
             _v2_slide(2, "CODE_COMPARISON", components={"comparison": [{"label": "Loop", "left": "Instantiate", "right": "Pool"}, {"label": "Load", "left": "Eager", "right": "Lazy"}]}),
             _v2_slide(3, "PROCESS_FLOW_WITH_CALLOUT", components={"flow_steps": [{"step": "1", "label": "Start", "action": "Load settings"}, {"step": "2", "label": "Choose", "action": "Set locale"}, {"step": "3", "label": "Load", "action": "Lazy load table"}], "callout_box": {"type": "INSIGHT", "text": "Load only what is needed."}}),
             _v2_slide(4, "CODE_COMPARISON", components={"comparison": [{"label": "CPU", "left": "Find", "right": "Cache"}, {"label": "Physics", "left": "Default", "right": "Limit"}]}),
             _v2_slide(5, "CODE_COMPARISON", components={"comparison": [{"label": "RAM", "left": "New", "right": "Reuse"}, {"label": "UI", "left": "Always", "right": "Batch"}]}),
         ]
-        with self.assertRaises(ValueError):
-            SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": missing_anchors})
+        too_many_dual_pillars = [
+            _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "icon", "icon_key": "rocket", "caption": "Main idea"}}),
+            _v2_slide(2, "DUAL_PILLARS", components={"cards": [_card("01"), _card("02")]}),
+            _v2_slide(3, "DUAL_PILLARS", components={"cards": [_card("01"), _card("02")]}),
+            _v2_slide(4, "DUAL_PILLARS", components={"cards": [_card("01"), _card("02")]}),
+            _v2_slide(5, "CHECKLIST", title="Preflight", components={"checklist": [{"icon_key": "check", "text": "Run final checks"}] * 4}),
+        ]
+        deck = SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": too_many_dual_pillars})
+        issues = _review_deck_design(deck)
+        self.assertTrue(any("Too many DUAL_PILLARS" in issue for issue in issues))
 
         invalid_icon = _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "icon", "icon_key": "not-real", "caption": "Main idea"}})
         with self.assertRaises(ValueError):
-            SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": [invalid_icon, *missing_anchors[1:]]})
+            SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": [invalid_icon, *base_slides[1:]]})
 
         bad_process = _v2_slide(
             3,
@@ -396,7 +421,7 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
             },
         )
         with self.assertRaises(ValueError):
-            SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": [missing_anchors[0], missing_anchors[1], bad_process, *missing_anchors[3:]]})
+            SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": [base_slides[0], base_slides[1], bad_process, *base_slides[3:]]})
 
         duplicate_visuals = [
             _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "source_page", "source_index": 1, "page": 3, "caption": "Diagram"}}),
@@ -461,9 +486,9 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
         deck = SlideDeckPayload.model_validate(repaired)
 
         self.assertEqual(deck.slide_count, 5)
-        self.assertLessEqual(len(deck.slides[1].components.cards[0].desc.split()), 16)
+        self.assertLessEqual(len(deck.slides[1].components.cards[0].desc.split()), 24)
         self.assertEqual(deck.slides[2].components.flow_steps[0].step, "")
-        self.assertEqual(deck.slides[2].components.flow_steps[2].action, "Cập nhật giao diện người dùng bằng dữ liệu bản dịch mới.")
+        self.assertEqual(deck.slides[2].components.flow_steps[2].action, "Cập nhật giao diện người dùng bằng dữ liệu bản dịch mới nhất")
 
     def test_visible_word_count_ignores_flow_step_marker(self) -> None:
         slide = _v2_slide(
@@ -529,9 +554,290 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
         deck = SlideDeckPayload.model_validate(repaired)
 
         self.assertEqual(deck.slide_count, 5)
-        self.assertLessEqual(_slide_visible_word_count(repaired["slides"][1]), 70)
+        self.assertGreater(_slide_visible_word_count(repaired["slides"][1]), 0)
         self.assertEqual(repaired["slides"][1]["bullets"], [])
         self.assertEqual(repaired["slides"][1]["content"], {})
+
+    def test_card_points_allow_dense_grid_without_exceeding_layout_budget(self) -> None:
+        dense_card = _card(
+            "01",
+            "Runtime Table",
+            "Lazy load tables through Addressables to keep startup memory controlled",
+            ["Bind UI labels", "Cache selected locale"],
+        )
+        slides = [
+            _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "icon", "icon_key": "rocket", "caption": "Main idea"}}),
+            _v2_slide(2, "GRID_COMPOSITE", title="Localization Runtime Density", components={"cards": [dense_card, _card("02", points=["Use smart strings", "Test pseudo locale"]), _card("03", points=["Split asset tables", "Avoid hardcode"])]}),
+            _v2_slide(3, "DUAL_PILLARS", components={"cards": [_card("01", points=["Profile first"]), _card("02", points=["Cache hot paths"])]}),
+            _v2_slide(
+                4,
+                "METRIC_DASHBOARD",
+                components={
+                    "metrics": [
+                        {"icon_key": "cpu", "value": "CPU", "label": "Script budget", "context": "Profile hot paths"},
+                        {"icon_key": "gauge", "value": "FPS", "label": "Frame target", "context": "Avoid spikes"},
+                        {"icon_key": "database", "value": "RAM", "label": "Memory load", "context": "Use pooling"},
+                    ]
+                },
+            ),
+            _v2_slide(5, "CHECKLIST", title="Preflight Checklist", components={"checklist": [{"icon_key": "check", "text": "Run final checks"}] * 4}),
+        ]
+
+        deck = SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": slides})
+
+        self.assertGreater(_slide_visible_word_count(deck.slides[1].model_dump()), 0)
+        with self.assertRaises(ValueError):
+            SlideDeckPayload.model_validate(
+                {
+                    "title": "Deck",
+                    "slide_count": 5,
+                    "slides": [
+                        slides[0],
+                        _v2_slide(2, "GRID_COMPOSITE", components={"cards": [_card("01", points=["one two three four five six seven eight nine ten eleven twelve thirteen fourteen fifteen"]), _card("02"), _card("03")]}),
+                        *slides[2:],
+                    ],
+                }
+            )
+
+    def test_v4_layouts_validate_component_shapes(self) -> None:
+        timeline_steps = [
+            {"step": str(index), "label": label, "action": action}
+            for index, (label, action) in enumerate(
+                [
+                    ("Start", "Load settings"),
+                    ("Locale", "Set locale"),
+                    ("Table", "Lazy load table"),
+                    ("String", "Resolve key"),
+                    ("UI", "Render text"),
+                ],
+                1,
+            )
+        ]
+        table_rows = [
+            {"icon_key": "languages", "label": "Hardcode", "left": "Fast but fixed", "right": "Avoid in production"},
+            {"icon_key": "file-json", "label": "JSON", "left": "Flexible files", "right": "Needs tooling"},
+            {"icon_key": "table", "label": "String Table", "left": "Editor managed", "right": "Use for shipping"},
+        ]
+        icon_cards = [
+            _card("01", "Profiler", "Trace spikes before optimizing", ["Watch GC.Alloc", "Check frame timeline"]),
+            _card("02", "Pool", "Reuse repeated objects", ["Avoid instantiate churn"]),
+            _card("03", "Physics", "Limit collision work", ["Use LayerMask"]),
+            _card("04", "Memory", "Stream assets deliberately", ["Unload unused scenes"]),
+        ]
+        slides = [
+            _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "icon", "icon_key": "rocket", "caption": "Main idea"}}),
+            _v2_slide(2, "PROCESS_TIMELINE", components={"flow_steps": timeline_steps}),
+            _v2_slide(3, "COMPARISON_TABLE", components={"comparison": table_rows}),
+            _v2_slide(4, "ICON_GRID", components={"cards": icon_cards}),
+            _v2_slide(5, "CHECKLIST", title="Preflight Checklist", components={"checklist": [{"icon_key": "check", "text": "Run final checks"}] * 4}),
+        ]
+
+        deck = SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": slides})
+
+        self.assertEqual(deck.slides[1].layout_type, "PROCESS_TIMELINE")
+        with self.assertRaises(ValueError):
+            SlideDeckPayload.model_validate(
+                {
+                    "title": "Deck",
+                    "slide_count": 5,
+                    "slides": [slides[0], _v2_slide(2, "PROCESS_TIMELINE", components={"flow_steps": timeline_steps[:4]}), *slides[2:]],
+                }
+            )
+
+    def test_slide_requires_visible_title(self) -> None:
+        table_rows = [
+            {"icon_key": "languages", "label": "Hardcode", "left": "Fixed text", "right": "Use tables"},
+            {"icon_key": "file-json", "label": "JSON", "left": "Manual files", "right": "Add tooling"},
+            {"icon_key": "table", "label": "Package", "left": "Editor flow", "right": "Ship tables"},
+        ]
+        slides = [
+            _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "icon", "icon_key": "rocket", "caption": "Main idea"}}),
+            _v2_slide(2, "GRID_COMPOSITE", components={"cards": [_card("01"), _card("02"), _card("03")]}),
+            _v2_slide(3, "COMPARISON_TABLE", components={"comparison": table_rows}),
+            _v2_slide(4, "ICON_GRID", components={"cards": [_card("01"), _card("02"), _card("03"), _card("04")]}),
+            _v2_slide(5, "CHECKLIST", title="Preflight Checklist", components={"checklist": [{"icon_key": "check", "text": "Run final checks"}] * 4}),
+        ]
+        slides[1]["title"] = ""
+
+        with self.assertRaises(ValueError):
+            SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": slides})
+
+    def test_review_flags_generic_slide_titles(self) -> None:
+        table_rows = [
+            {"icon_key": "languages", "label": "Hardcode", "left": "Fixed text", "right": "Use tables"},
+            {"icon_key": "file-json", "label": "JSON", "left": "Manual files", "right": "Add tooling"},
+            {"icon_key": "table", "label": "Package", "left": "Editor flow", "right": "Ship tables"},
+        ]
+        slides = [
+            _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "icon", "icon_key": "rocket", "caption": "Main idea"}}),
+            _v2_slide(2, "GRID_COMPOSITE", title="Overview", components={"cards": [_card("01"), _card("02"), _card("03")]}),
+            _v2_slide(3, "COMPARISON_TABLE", components={"comparison": table_rows}),
+            _v2_slide(4, "ICON_GRID", components={"cards": [_card("01"), _card("02"), _card("03"), _card("04")]}),
+            _v2_slide(5, "CHECKLIST", title="Preflight Checklist", components={"checklist": [{"icon_key": "check", "text": "Run final checks"}] * 4}),
+        ]
+        deck = SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": slides})
+
+        issues = _review_deck_design(deck)
+
+        self.assertTrue(any("title is too generic" in issue for issue in issues))
+
+    def test_repeated_layouts_are_review_issues_not_schema_failures(self) -> None:
+        slides = [
+            _v2_slide(1, "TITLE_HERO", title="Unity Runtime Systems", components={"visual_anchor": {"kind": "icon", "icon_key": "rocket", "caption": "Main idea"}}),
+            _v2_slide(2, "GRID_COMPOSITE", title="Localization Building Blocks", components={"cards": [_card("01"), _card("02"), _card("03")]}),
+            _v2_slide(3, "GRID_COMPOSITE", title="Table Architecture Choices", components={"cards": [_card("01"), _card("02"), _card("03")]}),
+            _v2_slide(4, "GRID_COMPOSITE", title="Runtime Event Channels", components={"cards": [_card("01"), _card("02"), _card("03")]}),
+            _v2_slide(5, "CHECKLIST", title="Production Readiness Checks", components={"checklist": [{"icon_key": "check", "text": "Run final checks"}] * 4}),
+        ]
+
+        deck = SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": slides})
+        issues = _review_deck_design(deck)
+
+        self.assertTrue(any("more than two times consecutively" in issue for issue in issues))
+
+    def test_icon_grid_four_cards_uses_balanced_two_by_two_boxes(self) -> None:
+        boxes = _icon_grid_boxes(4)
+
+        self.assertEqual(len(boxes), 4)
+        self.assertEqual([box[0] for box in boxes], [250, 840, 250, 840])
+        self.assertEqual([box[1] for box in boxes], [220, 220, 495, 495])
+
+    def test_deck_prompt_contains_layout_intelligence_rules(self) -> None:
+        outline = StoryOutlinePayload.model_validate(
+            {
+                "title": "Deck",
+                "slide_count": 5,
+                "chapters": ["Unity"],
+                "slides": [
+                    {"slide_number": 1, "chapter": "Unity", "layout_type": "TITLE_HERO", "title": "Unity Systems", "purpose": "Open", "visual_strategy": "icon"},
+                    {"slide_number": 2, "chapter": "Unity", "layout_type": "GRID_COMPOSITE", "title": "Localization Methods", "purpose": "Compare", "visual_strategy": "icon"},
+                    {"slide_number": 3, "chapter": "Unity", "layout_type": "PROCESS_TIMELINE", "title": "Runtime Flow", "purpose": "Explain", "visual_strategy": "icon"},
+                    {"slide_number": 4, "chapter": "Unity", "layout_type": "ICON_GRID", "title": "Optimization Techniques", "purpose": "Group", "visual_strategy": "icon"},
+                    {"slide_number": 5, "chapter": "Unity", "layout_type": "CHECKLIST", "title": "Production Checks", "purpose": "Apply", "visual_strategy": "icon"},
+                ],
+                "coverage_map": [],
+            }
+        )
+
+        prompt = _deck_prompt("Unity context", ["unity.pdf"], [], outline, "")
+
+        self.assertIn("Every slide must be self-contained", prompt)
+        self.assertIn("Exactly four independent ideas must use ICON_GRID", prompt)
+        self.assertIn("one core idea per slide", prompt)
+
+    def test_fallback_story_outline_covers_topics_after_planner_json_failure(self) -> None:
+        outline = _fallback_story_outline(
+            context="Unity Localization và tối ưu hóa hiệu suất trong runtime.",
+            document_names=["Unity.pdf"],
+            coverage_topics=[
+                "Localization Methods",
+                "Runtime Localization Flow",
+                "Profiler Diagnostics",
+                "Garbage Collector",
+                "Memory And Asset Management",
+            ],
+        )
+
+        self.assertGreaterEqual(outline.slide_count, 5)
+        self.assertLessEqual(outline.slide_count, 12)
+        self.assertEqual(outline.title, "Hệ thống Localization và Tối ưu hóa Hiệu suất trong Unity")
+        self.assertEqual(outline.slides[0].layout_type, "TITLE_HERO")
+        self.assertEqual(outline.slides[0].title, outline.title)
+        self.assertTrue(any(slide.layout_type == "TRANSITION" for slide in outline.slides))
+        self.assertTrue(any(item.topic == "Profiler Diagnostics" for item in outline.coverage_map))
+
+    def test_review_rejects_empty_visual_anchor_slide(self) -> None:
+        slides = [
+            _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "icon", "icon_key": "rocket", "caption": "Main idea"}}),
+            _v2_slide(
+                2,
+                "VISUAL_ANCHOR",
+                title="Profiler Diagnostics",
+                components={"visual_anchor": {"kind": "icon", "icon_key": "gauge", "caption": "Use Profiler for CPU, GPU, and Memory traces."}},
+            ),
+            _v2_slide(3, "COMPARISON_TABLE", components={"comparison": [
+                {"icon_key": "cpu", "label": "CPU", "left": "Guess hotspots", "right": "Trace scripts"},
+                {"icon_key": "memory-stick", "label": "Memory", "left": "Ignore alloc", "right": "Watch GC.Alloc"},
+                {"icon_key": "gauge", "label": "Frame", "left": "Average FPS", "right": "Catch spikes"},
+            ]}),
+            _v2_slide(4, "ICON_GRID", components={"cards": [
+                _card("01", heading="Physics", points=["Limit layers", "Batch casts"]),
+                _card("02", heading="Rendering", points=["Cull early", "Batch UI"]),
+                _card("03", heading="Assets", points=["Lazy load", "Release unused"]),
+                _card("04", heading="Pooling", points=["Reuse objects", "Avoid churn"]),
+            ]}),
+            _v2_slide(5, "CHECKLIST", title="Production Checks", components={"checklist": [{"icon_key": "check", "text": "Run final checks"}] * 4}),
+        ]
+        deck = SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": slides})
+
+        issues = _review_deck_design(deck)
+
+        self.assertTrue(any("VISUAL_ANCHOR with no explanatory body" in issue for issue in issues))
+
+    def test_review_rejects_sparse_large_frame_slides(self) -> None:
+        slides = [
+            _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "icon", "icon_key": "rocket", "caption": "Main idea"}}),
+            _v2_slide(2, "DUAL_PILLARS", components={"cards": [_card("01", desc="Tiny cue"), _card("02", desc="Tiny cue")]}),
+            _v2_slide(3, "GRID_COMPOSITE", components={"cards": [_card("01", desc="Tiny cue"), _card("02", desc="Tiny cue"), _card("03", desc="Tiny cue")]}),
+            _v2_slide(4, "TRANSITION", title="Change Chapter", components={}),
+            _v2_slide(5, "DUAL_PILLARS", components={"cards": [_card("01", desc="Tiny cue"), _card("02", desc="Tiny cue")]}),
+            _v2_slide(
+                6,
+                "METRIC_DASHBOARD",
+                components={
+                    "metrics": [
+                        {"icon_key": "cpu", "value": "CPU", "label": "Script budget", "context": "Profile paths"},
+                        {"icon_key": "gauge", "value": "FPS", "label": "Frame target", "context": "Avoid spikes"},
+                        {"icon_key": "database", "value": "RAM", "label": "Memory load", "context": "Use pooling"},
+                    ]
+                },
+            ),
+            _v2_slide(7, "CHECKLIST", title="Preflight Checklist", components={"checklist": [{"icon_key": "check", "text": "Run final checks"}] * 4}),
+            _v2_slide(8, "GRID_COMPOSITE", components={"cards": [_card("01", desc="Tiny cue"), _card("02", desc="Tiny cue"), _card("03", desc="Tiny cue")]}),
+        ]
+
+        deck = SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 8, "slides": slides})
+        issues = _review_deck_design(deck)
+
+        self.assertTrue(any("Too many sparse large-frame slides" in issue for issue in issues))
+
+    def test_coverage_topics_detect_unity_source_and_reviewer_rejects_missing_topic(self) -> None:
+        context = """
+        Unity Localization Package uses String Table and Asset Table collections. SelectedLocale drives runtime table loading.
+        Smart Strings handle plural values. Pseudo localization catches hardcode and font overflow.
+        The Unity Profiler shows GC.Alloc spikes on the frame timeline. Object Pooling avoids Instantiate churn.
+        Physics uses Collision Matrix and Raycast LayerMask. Rendering uses GPU occlusion culling, texture atlas, and baked lighting.
+        Addressables and AssetBundles control memory, RAM, texture, audio, mesh, shader, and scene loading.
+        """
+
+        topics = _expected_coverage_topics(context)
+
+        self.assertIn("Localization Methods", topics)
+        self.assertIn("Profiler Diagnostics", topics)
+        self.assertIn("Pre-flight Checklist", topics)
+
+        slides = [
+            _v2_slide(1, "TITLE_HERO", components={"visual_anchor": {"kind": "icon", "icon_key": "rocket", "caption": "Main idea"}}),
+            _v2_slide(2, "GRID_COMPOSITE", components={"cards": [_card("01", heading="Localization"), _card("02", heading="Tables"), _card("03", heading="Locale")]}),
+            _v2_slide(3, "DUAL_PILLARS", components={"cards": [_card("01", heading="String Table"), _card("02", heading="Addressables")]}),
+            _v2_slide(
+                4,
+                "METRIC_DASHBOARD",
+                components={
+                    "metrics": [
+                        {"icon_key": "globe", "value": "i18n", "label": "Locale system", "context": "Load tables"},
+                        {"icon_key": "database", "value": "RAM", "label": "Memory load", "context": "Lazy load"},
+                        {"icon_key": "check", "value": "QA", "label": "Pseudo tests", "context": "Find hardcode"},
+                    ]
+                },
+            ),
+            _v2_slide(5, "CHECKLIST", title="Preflight Checklist", components={"checklist": [{"icon_key": "check", "text": "Run final checks"}] * 4}),
+        ]
+        deck = SlideDeckPayload.model_validate({"title": "Deck", "slide_count": 5, "slides": slides})
+
+        issues = _review_deck_design(deck, coverage_topics=["Profiler Diagnostics"])
+
+        self.assertTrue(any("Missing important source topics" in issue for issue in issues))
 
     def test_repair_deck_payload_removes_image_visuals_from_non_visual_layouts(self) -> None:
         payload = {
@@ -699,8 +1005,131 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
             for slide in result["slides"]
             if slide["visual"].get("kind") == "generated_image" and slide["visual"].get("data_url")
         ]
-        self.assertEqual(len(generated), 2)
-        self.assertEqual(result["image_generation_count"], 2)
+        self.assertEqual(len(generated), 1)
+        self.assertEqual(result["image_generation_count"], 1)
+
+    def test_materialize_visuals_promotes_matching_visual_anchor_to_source_crop(self) -> None:
+        deck = {
+            "title": "Deck",
+            "slides": [
+                {
+                    "slide_number": 1,
+                    "layout_type": "VISUAL_ANCHOR",
+                    "title": "Chẩn đoán Hiệu suất bằng Profiler",
+                    "subtitle": None,
+                    "components": {
+                        "visual_anchor": {
+                            "kind": "icon",
+                            "icon_key": "search",
+                            "caption": "Phân tích hiệu suất CPU, GPU, Memory và Rendering",
+                        },
+                        "callout_box": {"type": "INSIGHT", "text": "Profiler xác định lag, giật, crash."},
+                    },
+                    "visual": {"kind": "none"},
+                }
+            ],
+        }
+
+        with patch(
+            "app.modules.slides.tasks._source_visual_data_and_crop",
+            return_value=("data:image/jpeg;base64,abc", {"x": 0.1, "y": 0.2, "width": 0.5, "height": 0.4}),
+        ) as source_visual:
+            result = _materialize_visuals(
+                deck=deck,
+                genai_client=Mock(),
+                image_model="gemini-2.5-flash-image",
+                crop_model="gemini-2.5-flash",
+                client=Mock(),
+                settings=SimpleNamespace(uploads_dir="/tmp"),
+                user_id="user-1",
+                notebook_id="notebook-1",
+                visual_candidates=[
+                    {
+                        "source_index": 8,
+                        "document_name": "Optimization Unity",
+                        "page_range": "4-4",
+                        "page": 4,
+                        "excerpt": "Profiler timeline shows CPU GPU Memory Rendering frame spikes and Camera.Render samples.",
+                    }
+                ],
+            )
+
+        slide = result["slides"][0]
+        self.assertEqual(slide["visual"]["kind"], "source_page")
+        self.assertEqual(slide["visual"]["source_index"], 8)
+        self.assertEqual(slide["visual"]["page"], 4)
+        self.assertEqual(slide["components"]["visual_anchor"]["kind"], "source_page")
+        self.assertEqual(result["source_crop_count"], 1)
+        self.assertEqual(source_visual.call_count, 1)
+
+    def test_materialize_visuals_stores_valid_source_crop_box(self) -> None:
+        deck = {
+            "title": "Deck",
+            "slides": [
+                {
+                    "slide_number": 1,
+                    "layout_type": "VISUAL_ANCHOR",
+                    "title": "Profiler Flow",
+                    "components": {"visual_anchor": {"kind": "source_page", "source_index": 1, "page": 3, "caption": "Profiler diagram"}},
+                    "visual": {"kind": "source_page", "source_index": 1, "page": 3},
+                }
+            ],
+        }
+
+        with patch(
+            "app.modules.slides.tasks._source_visual_data_and_crop",
+            return_value=("data:image/jpeg;base64,abc", {"x": 0.1, "y": 0.2, "width": 0.5, "height": 0.4}),
+        ) as source_visual:
+            result = _materialize_visuals(
+                deck=deck,
+                genai_client=Mock(),
+                image_model="gemini-2.5-flash-image",
+                crop_model="gemini-2.5-flash",
+                client=Mock(),
+                settings=SimpleNamespace(uploads_dir="/tmp"),
+                user_id="user-1",
+                notebook_id="notebook-1",
+                visual_candidates=[{"source_index": 1}],
+            )
+
+        self.assertEqual(result["slides"][0]["visual"]["crop_box"]["x"], 0.1)
+        self.assertEqual(result["slides"][0]["components"]["visual_anchor"]["crop_box"]["width"], 0.5)
+        self.assertEqual(result["source_crop_count"], 1)
+        self.assertEqual(source_visual.call_args.kwargs["crop_model"], "gemini-2.5-flash")
+
+    def test_choose_source_crop_box_returns_none_for_low_confidence_or_invalid_crop(self) -> None:
+        image = Image.new("RGB", (800, 600), "#ffffff")
+        low_confidence_client = SimpleNamespace(
+            models=SimpleNamespace(
+                generate_content=Mock(
+                    return_value=SimpleNamespace(
+                        text='{"crop_box":{"x":0.1,"y":0.1,"width":0.6,"height":0.6},"confidence":0.2,"rationale":"weak"}'
+                    )
+                )
+            )
+        )
+        valid_client = SimpleNamespace(
+            models=SimpleNamespace(
+                generate_content=Mock(
+                    return_value=SimpleNamespace(
+                        text='{"crop_box":{"x":0.1,"y":0.1,"width":0.6,"height":0.6},"confidence":0.9,"rationale":"diagram"}'
+                    )
+                )
+            )
+        )
+        invalid_client = SimpleNamespace(
+            models=SimpleNamespace(
+                generate_content=Mock(
+                    return_value=SimpleNamespace(
+                        text='{"crop_box":{"x":0.9,"y":0.9,"width":0.4,"height":0.4},"confidence":0.9,"rationale":"outside"}'
+                    )
+                )
+            )
+        )
+
+        self.assertIsNone(_choose_source_crop_box(low_confidence_client, "gemini-2.5-flash", image, "Profiler"))
+        self.assertIsNone(_choose_source_crop_box(invalid_client, "gemini-2.5-flash", image, "Profiler"))
+        self.assertEqual(_choose_source_crop_box(valid_client, "gemini-2.5-flash", image, "Profiler").width, 0.6)
 
     def test_task_skips_when_deck_was_deleted_before_worker_start(self) -> None:
         client = FakeSupabaseClient()

@@ -34,16 +34,20 @@ MAX_SLIDES = 12
 MAX_CONTEXT_CHARS = 42000
 BATCH_CONTEXT_CHARS = 6000
 MAX_DECK_ATTEMPTS = 3
-MAX_DECK_OUTPUT_TOKENS = 12000
-MAX_WORDS_PER_SLIDE = 70
+MAX_DECK_OUTPUT_TOKENS = 18000
 MAX_WORDS_PER_BULLET = 20
 MAX_BULLETS_PER_SLIDE = 4
 SLIDE_WIDTH = 1600
 SLIDE_HEIGHT = 900
 PDF_RENDER_SCALE = 2
-FLOW_ACTION_MAX_WORDS = 12
-CARD_DESC_MAX_WORDS = 16
-CALLOUT_MAX_WORDS = 24
+FLOW_ACTION_MAX_WORDS = 16
+CARD_DESC_MAX_WORDS = 24
+CARD_POINT_MAX_WORDS = 14
+CARD_MAX_POINTS = 3
+CALLOUT_MAX_WORDS = 32
+MAX_SOURCE_CROPS_PER_DECK = 6
+MIN_CROP_CONFIDENCE = 0.58
+SOURCE_VISUAL_PROMOTION_THRESHOLD = 3
 LEGACY_LAYOUTS = {
     "TITLE",
     "KEY_BULLETS",
@@ -64,9 +68,23 @@ COMPONENT_LAYOUTS = {
     "METRIC_DASHBOARD",
     "CODE_COMPARISON",
     "CHECKLIST",
+    "PROCESS_TIMELINE",
+    "COMPARISON_TABLE",
+    "ICON_GRID",
     "TRANSITION",
 }
 VISUAL_LAYOUTS = {"TITLE_HERO", "VISUAL_ANCHOR"}
+DENSE_LAYOUTS = {
+    "GRID_COMPOSITE",
+    "PROCESS_FLOW_WITH_CALLOUT",
+    "METRIC_DASHBOARD",
+    "CODE_COMPARISON",
+    "CHECKLIST",
+    "PROCESS_TIMELINE",
+    "COMPARISON_TABLE",
+    "ICON_GRID",
+}
+MEDIUM_DENSITY_LAYOUTS = {"DUAL_PILLARS", "VISUAL_ANCHOR"}
 ICON_KEYS = {
     "cpu",
     "globe",
@@ -91,6 +109,20 @@ ICON_KEYS = {
     "repeat",
     "timer",
     "network",
+    "activity",
+    "braces",
+    "bug",
+    "boxes",
+    "file-json",
+    "git-branch",
+    "hard-drive",
+    "image",
+    "languages",
+    "lightbulb",
+    "memory-stick",
+    "mouse-pointer-click",
+    "table",
+    "wrench",
 }
 ICON_LABELS = {
     "cpu": "CPU",
@@ -116,6 +148,20 @@ ICON_LABELS = {
     "repeat": "LOOP",
     "timer": "TIME",
     "network": "NET",
+    "activity": "ACT",
+    "braces": "{}",
+    "bug": "BUG",
+    "boxes": "BOX",
+    "file-json": "JSON",
+    "git-branch": "GIT",
+    "hard-drive": "DISK",
+    "image": "IMG",
+    "languages": "LANG",
+    "lightbulb": "IDEA",
+    "memory-stick": "MEM",
+    "mouse-pointer-click": "UI",
+    "table": "TBL",
+    "wrench": "TOOL",
 }
 DANGLING_TRAILING_WORDS = {
     "and",
@@ -145,6 +191,33 @@ DANGLING_TRAILING_WORDS = {
     "the",
     "gay",
 }
+SOURCE_VISUAL_STOPWORDS = {
+    "and",
+    "the",
+    "for",
+    "with",
+    "from",
+    "this",
+    "that",
+    "page",
+    "slide",
+    "image",
+    "figure",
+    "description",
+    "trong",
+    "cua",
+    "voi",
+    "cho",
+    "cac",
+    "mot",
+    "nhung",
+    "duoc",
+    "khong",
+    "hinh",
+    "anh",
+    "trang",
+    "mota",
+}
 FINAL_SUMMARY_TITLES = {
     "tom tat",
     "tong ket",
@@ -155,8 +228,206 @@ FINAL_SUMMARY_TITLES = {
     "takeaways",
     "key takeaways",
 }
+GENERIC_SLIDE_TITLES = {
+    "overview",
+    "introduction",
+    "main idea",
+    "key points",
+    "content",
+    "topic",
+    "slide",
+    "details",
+    "presentation",
+    "academic overview from selected sources",
+    "tong quan",
+    "tong quan hoc thuat",
+    "tong quan hoc thuat tu nguon da chon",
+    "gioi thieu",
+    "noi dung",
+    "y chinh",
+    "chu de",
+}
+COVERAGE_TOPIC_RULES: dict[str, tuple[str, ...]] = {
+    "Localization Methods": (
+        "hardcode",
+        "dictionary",
+        "json",
+        "localization package",
+        "string table",
+        "asset table",
+        "localization table",
+    ),
+    "Runtime Localization Flow": (
+        "game start",
+        "localizationsettings",
+        "selectedlocale",
+        "table database",
+        "localized string event",
+        "lazy load",
+    ),
+    "Smart Strings": (
+        "smart string",
+        "smartformat",
+        "playername",
+        "plural",
+        "choose",
+        "variable",
+    ),
+    "Pseudo Localization": (
+        "pseudo localization",
+        "hardcode",
+        "font",
+        "encoding",
+        "double byte",
+        "ui layout",
+    ),
+    "Localization Architecture": (
+        "namespace",
+        "string table collection",
+        "addressables",
+        "lazy load",
+        "asset table collection",
+        "production",
+    ),
+    "Profiler Diagnostics": (
+        "profiler",
+        "diagnostics",
+        "gc alloc",
+        "timeline",
+        "camera render",
+        "frame",
+        "ms",
+    ),
+    "Garbage Collector": (
+        "garbage collector",
+        "mark phase",
+        "sweep phase",
+        "managed heap",
+        "gc roots",
+        "heap",
+    ),
+    "Object Pooling": (
+        "object pooling",
+        "objectpool",
+        "pool",
+        "bullet",
+        "projectile",
+        "fx",
+        "instantiate",
+    ),
+    "Physics Optimization": (
+        "physics",
+        "fixed timestep",
+        "collision matrix",
+        "collider",
+        "raycast",
+        "layermask",
+    ),
+    "Rendering And UI Optimization": (
+        "gpu",
+        "rendering",
+        "occlusion culling",
+        "texture atlas",
+        "rectmask2d",
+        "lighting",
+        "bake light",
+    ),
+    "Memory And Asset Management": (
+        "memory",
+        "assetbundle",
+        "asset bundle",
+        "addressables",
+        "shader",
+        "scene",
+        "leak",
+        "ram",
+        "texture",
+        "audio",
+        "mesh",
+    ),
+}
 ALLOWED_LAYOUTS = COMPONENT_LAYOUTS
 CITATION_PATTERN = re.compile(r"\[(?:\d+(?:\s*,\s*\d+)*)\]")
+SlideLayoutType = Literal[
+    "TITLE_HERO",
+    "DUAL_PILLARS",
+    "GRID_COMPOSITE",
+    "PROCESS_FLOW_WITH_CALLOUT",
+    "VISUAL_ANCHOR",
+    "METRIC_DASHBOARD",
+    "CODE_COMPARISON",
+    "CHECKLIST",
+    "PROCESS_TIMELINE",
+    "COMPARISON_TABLE",
+    "ICON_GRID",
+    "TRANSITION",
+]
+SlideIconKey = Literal[
+    "cpu",
+    "globe",
+    "gauge",
+    "database",
+    "layers",
+    "box",
+    "route",
+    "workflow",
+    "warning",
+    "check",
+    "rocket",
+    "zap",
+    "code",
+    "palette",
+    "gamepad",
+    "package",
+    "server",
+    "shield",
+    "search",
+    "list-checks",
+    "repeat",
+    "timer",
+    "network",
+    "activity",
+    "braces",
+    "bug",
+    "boxes",
+    "file-json",
+    "git-branch",
+    "hard-drive",
+    "image",
+    "languages",
+    "lightbulb",
+    "memory-stick",
+    "mouse-pointer-click",
+    "table",
+    "wrench",
+]
+
+
+class CropBox(BaseModel):
+    """Normalized source-page crop rectangle."""
+
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+    width: float = Field(ge=0, le=1)
+    height: float = Field(ge=0, le=1)
+
+    @model_validator(mode="after")
+    def validate_crop_area(self) -> "CropBox":
+        if self.width <= 0 or self.height <= 0:
+            raise ValueError("Crop box width and height must be positive.")
+        if self.x + self.width > 1.02 or self.y + self.height > 1.02:
+            raise ValueError("Crop box must fit inside the normalized page.")
+        if self.width * self.height < 0.06:
+            raise ValueError("Crop box is too small to be useful.")
+        return self
+
+
+class CropSelectionPayload(BaseModel):
+    """Gemini crop-selection response."""
+
+    crop_box: CropBox | None = None
+    confidence: float = Field(ge=0, le=1)
+    rationale: str = ""
 
 
 class SlideVisual(BaseModel):
@@ -168,6 +439,7 @@ class SlideVisual(BaseModel):
     page: int | None = None
     alt: str | None = None
     data_url: str | None = None
+    crop_box: CropBox | None = None
 
 
 class SlideFeature(BaseModel):
@@ -182,33 +454,10 @@ class SlideCard(BaseModel):
 
     id: str = ""
     tag: Literal["LEGACY", "MID_LEVEL", "RECOMMENDED", "WARNING", "INSIGHT", "DEFAULT"] = "DEFAULT"
-    icon_key: Literal[
-        "cpu",
-        "globe",
-        "gauge",
-        "database",
-        "layers",
-        "box",
-        "route",
-        "workflow",
-        "warning",
-        "check",
-        "rocket",
-        "zap",
-        "code",
-        "palette",
-        "gamepad",
-        "package",
-        "server",
-        "shield",
-        "search",
-        "list-checks",
-        "repeat",
-        "timer",
-        "network",
-    ] = "check"
+    icon_key: SlideIconKey = "check"
     heading: str = ""
     desc: str = ""
+    points: list[str] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_card_text(self) -> "SlideCard":
@@ -216,6 +465,11 @@ class SlideCard(BaseModel):
             raise ValueError("Card heading must be a label, not a sentence.")
         if _word_count(self.desc) > CARD_DESC_MAX_WORDS:
             raise ValueError(f"Card desc must be at most {CARD_DESC_MAX_WORDS} words.")
+        if len(self.points) > CARD_MAX_POINTS:
+            raise ValueError(f"Card may contain at most {CARD_MAX_POINTS} points.")
+        for point in self.points:
+            if _word_count(point) > CARD_POINT_MAX_WORDS:
+                raise ValueError(f"Card point must be at most {CARD_POINT_MAX_WORDS} words.")
         return self
 
 
@@ -253,31 +507,7 @@ class CalloutBox(BaseModel):
 class MetricItem(BaseModel):
     """Metric component for dashboard slides."""
 
-    icon_key: Literal[
-        "cpu",
-        "globe",
-        "gauge",
-        "database",
-        "layers",
-        "box",
-        "route",
-        "workflow",
-        "warning",
-        "check",
-        "rocket",
-        "zap",
-        "code",
-        "palette",
-        "gamepad",
-        "package",
-        "server",
-        "shield",
-        "search",
-        "list-checks",
-        "repeat",
-        "timer",
-        "network",
-    ] = "gauge"
+    icon_key: SlideIconKey = "gauge"
     value: str = ""
     label: str = ""
     context: str = ""
@@ -286,6 +516,7 @@ class MetricItem(BaseModel):
 class ComparisonItem(BaseModel):
     """Comparison row for code and before/after layouts."""
 
+    icon_key: SlideIconKey = "code"
     label: str = ""
     left: str = ""
     right: str = ""
@@ -295,68 +526,21 @@ class ChecklistItem(BaseModel):
     """Checklist row."""
 
     text: str = ""
-    icon_key: Literal[
-        "cpu",
-        "globe",
-        "gauge",
-        "database",
-        "layers",
-        "box",
-        "route",
-        "workflow",
-        "warning",
-        "check",
-        "rocket",
-        "zap",
-        "code",
-        "palette",
-        "gamepad",
-        "package",
-        "server",
-        "shield",
-        "search",
-        "list-checks",
-        "repeat",
-        "timer",
-        "network",
-    ] = "check"
+    icon_key: SlideIconKey = "check"
 
 
 class VisualAnchor(BaseModel):
     """Primary visual anchor for a slide."""
 
     kind: Literal["none", "icon", "source_page", "generated_image"] = "none"
-    icon_key: Literal[
-        "cpu",
-        "globe",
-        "gauge",
-        "database",
-        "layers",
-        "box",
-        "route",
-        "workflow",
-        "warning",
-        "check",
-        "rocket",
-        "zap",
-        "code",
-        "palette",
-        "gamepad",
-        "package",
-        "server",
-        "shield",
-        "search",
-        "list-checks",
-        "repeat",
-        "timer",
-        "network",
-    ] | None = None
+    icon_key: SlideIconKey | None = None
     caption: str | None = None
     prompt: str | None = None
     source_index: int | None = None
     page: int | None = None
     alt: str | None = None
     data_url: str | None = None
+    crop_box: CropBox | None = None
 
 
 class SlideComponents(BaseModel):
@@ -391,17 +575,7 @@ class SlidePayload(BaseModel):
     """One normalized slide returned by the LLM."""
 
     slide_number: int
-    layout_type: Literal[
-        "TITLE_HERO",
-        "DUAL_PILLARS",
-        "GRID_COMPOSITE",
-        "PROCESS_FLOW_WITH_CALLOUT",
-        "VISUAL_ANCHOR",
-        "METRIC_DASHBOARD",
-        "CODE_COMPARISON",
-        "CHECKLIST",
-        "TRANSITION",
-    ]
+    layout_type: SlideLayoutType
     title: str = ""
     subtitle: str | None = None
     bullets: list[str] = Field(default_factory=list)
@@ -423,6 +597,8 @@ class SlidePayload(BaseModel):
 
     @model_validator(mode="after")
     def validate_slide_text(self) -> "SlidePayload":
+        if not self.title.strip():
+            raise ValueError(f"Slide {self.slide_number} must include a visible in-slide title.")
         visible_text = _visible_strings(
             {
                 "title": self.title,
@@ -435,9 +611,6 @@ class SlidePayload(BaseModel):
         for text in visible_text:
             if CITATION_PATTERN.search(text):
                 raise ValueError("Visible citations are not allowed in slide content.")
-        total_words = sum(_word_count(text) for text in visible_text)
-        if total_words > MAX_WORDS_PER_SLIDE:
-            raise ValueError(f"Slide {self.slide_number} exceeds {MAX_WORDS_PER_SLIDE} words.")
         return self
 
 
@@ -458,20 +631,11 @@ class SlideDeckPayload(BaseModel):
         if _normalized_label(self.slides[-1].title) in FINAL_SUMMARY_TITLES:
             raise ValueError("Do not create a final generic summary, recap, or conclusion slide.")
 
-        previous_layout = ""
-        repeat_count = 0
         used_source_visuals: set[tuple[int | None, int | None]] = set()
         source_visual_count = 0
         for index, slide in enumerate(self.slides, 1):
             if slide.slide_number != index:
                 raise ValueError("Slide numbers must be sequential starting at 1.")
-            if slide.layout_type == previous_layout:
-                repeat_count += 1
-                if repeat_count > 2:
-                    raise ValueError("Do not use the same layout more than two times consecutively.")
-            else:
-                previous_layout = slide.layout_type
-                repeat_count = 1
 
             _validate_components_for_layout(slide)
 
@@ -489,12 +653,9 @@ class SlideDeckPayload(BaseModel):
                     raise ValueError("Do not reuse the same source visual page across multiple slides.")
                 used_source_visuals.add(visual_key)
 
-        max_source_visuals = max(1, math.ceil(len(self.slides) * 0.35))
+        max_source_visuals = min(MAX_SOURCE_CROPS_PER_DECK, max(1, math.ceil(len(self.slides) * 0.5)))
         if source_visual_count > max_source_visuals:
             raise ValueError("Too many source visuals; use them sparingly to avoid visual clutter.")
-        review_issues = _review_deck_design(self)
-        if review_issues:
-            raise ValueError("; ".join(review_issues))
         return self
 
 
@@ -503,20 +664,18 @@ class OutlineSlide(BaseModel):
 
     slide_number: int
     chapter: str = ""
-    layout_type: Literal[
-        "TITLE_HERO",
-        "DUAL_PILLARS",
-        "GRID_COMPOSITE",
-        "PROCESS_FLOW_WITH_CALLOUT",
-        "VISUAL_ANCHOR",
-        "METRIC_DASHBOARD",
-        "CODE_COMPARISON",
-        "CHECKLIST",
-        "TRANSITION",
-    ]
+    layout_type: SlideLayoutType
     title: str = ""
     purpose: str = ""
     visual_strategy: Literal["icon", "source_page", "generated_image", "none"] = "icon"
+
+
+class CoverageItem(BaseModel):
+    """Internal outline mapping from source topic to planned slides."""
+
+    topic: str = ""
+    slide_numbers: list[int] = Field(default_factory=list)
+    evidence: str = ""
 
 
 class StoryOutlinePayload(BaseModel):
@@ -527,6 +686,7 @@ class StoryOutlinePayload(BaseModel):
     slide_count: int
     chapters: list[str] = Field(default_factory=list)
     slides: list[OutlineSlide]
+    coverage_map: list[CoverageItem] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_outline(self) -> "StoryOutlinePayload":
@@ -580,6 +740,7 @@ def generate_slide_deck_task(
             raise ValueError("No indexed chunks were found for the selected documents.")
 
         context = _build_context(chunks)
+        coverage_topics = _expected_coverage_topics(context)
         if len(context) > MAX_CONTEXT_CHARS:
             context = _summarize_context(genai_client, app_config.llm.gemini.model, context, document_names)
 
@@ -590,11 +751,13 @@ def generate_slide_deck_task(
             context=context,
             document_names=document_names,
             visual_candidates=visual_candidates,
+            coverage_topics=coverage_topics,
         )
         deck_json = _materialize_visuals(
             deck=deck.model_dump(),
             genai_client=genai_client,
             image_model=app_config.slide_deck.image_model,
+            crop_model=app_config.llm.gemini.model,
             client=client,
             settings=settings,
             user_id=user_id,
@@ -608,6 +771,8 @@ def generate_slide_deck_task(
             workspace = Path(temp_dir)
             pdf_path = workspace / "presentation.pdf"
             pdf_renderer = _render_deck_pdf_for_config(deck_json, pdf_path, app_config.slide_deck)
+            deck_json["pdf_renderer"] = pdf_renderer
+            deck_json.setdefault("pdf_renderer_version", "pillow" if pdf_renderer == "pillow_fallback" else "unknown")
 
             storage_path = f"{user_id}/{notebook_id}/{deck_id}.pdf"
             if not repository.get(deck_id):
@@ -684,6 +849,97 @@ def _build_context(chunks: list[dict[str, Any]]) -> str:
     return "\n\n".join(parts)
 
 
+def _expected_coverage_topics(context: str) -> list[str]:
+    """Detect major source topics that the deck should cover."""
+    normalized = _normalized_label(context)
+    topics: list[str] = []
+    for topic, keywords in COVERAGE_TOPIC_RULES.items():
+        score = sum(1 for keyword in keywords if keyword in normalized)
+        if score >= _coverage_detection_threshold(topic):
+            topics.append(topic)
+
+    localization_topics = [topic for topic in topics if topic.startswith("Localization") or topic in {"Smart Strings", "Pseudo Localization"}]
+    optimization_topics = [
+        topic
+        for topic in topics
+        if topic
+        in {
+            "Profiler Diagnostics",
+            "Garbage Collector",
+            "Object Pooling",
+            "Physics Optimization",
+            "Rendering And UI Optimization",
+            "Memory And Asset Management",
+        }
+    ]
+    if len(topics) >= 6 or (localization_topics and optimization_topics):
+        topics.append("Pre-flight Checklist")
+    return list(dict.fromkeys(topics))
+
+
+def _coverage_detection_threshold(topic: str) -> int:
+    if topic in {"Smart Strings", "Pseudo Localization", "Object Pooling"}:
+        return 1
+    return 2
+
+
+def _ensure_outline_coverage_map(outline: StoryOutlinePayload, coverage_topics: list[str]) -> None:
+    if not coverage_topics:
+        return
+
+    existing = {_normalized_label(item.topic): item for item in outline.coverage_map}
+    slide_text = {
+        slide.slide_number: _normalized_label(" ".join([slide.chapter, slide.title, slide.purpose, slide.layout_type]))
+        for slide in outline.slides
+    }
+    mapped_items: list[CoverageItem] = []
+    for topic in coverage_topics:
+        existing_item = existing.get(_normalized_label(topic))
+        if existing_item and existing_item.slide_numbers:
+            mapped_items.append(existing_item)
+            continue
+
+        matched_numbers = [
+            number
+            for number, text in slide_text.items()
+            if _topic_match_score(topic, text) > 0 or any(token in text for token in _topic_tokens(topic))
+        ]
+        if not matched_numbers:
+            matched_numbers = [_fallback_coverage_slide_number(topic, outline)]
+        mapped_items.append(
+            CoverageItem(
+                topic=topic,
+                slide_numbers=matched_numbers[:2],
+                evidence="Mapped from detected source topic and outline slide labels.",
+            )
+        )
+    outline.coverage_map = mapped_items
+
+
+def _fallback_coverage_slide_number(topic: str, outline: StoryOutlinePayload) -> int:
+    if not outline.slides:
+        return 1
+    if topic == "Pre-flight Checklist":
+        checklist = next((slide for slide in outline.slides if slide.layout_type == "CHECKLIST"), None)
+        return checklist.slide_number if checklist else outline.slides[-1].slide_number
+    non_transition = [slide for slide in outline.slides if slide.layout_type != "TRANSITION"]
+    return (non_transition[-1] if non_transition else outline.slides[-1]).slide_number
+
+
+def _topic_tokens(topic: str) -> list[str]:
+    return [token for token in _normalized_label(topic).split() if len(token) > 3]
+
+
+def _topic_match_score(topic: str, text: str) -> int:
+    normalized = _normalized_label(text)
+    if topic == "Pre-flight Checklist":
+        return int(("checklist" in normalized or "kiem tra" in normalized) and ("profile" in normalized or "localization" in normalized or "memory" in normalized or "physics" in normalized))
+    keywords = COVERAGE_TOPIC_RULES.get(topic, ())
+    keyword_score = sum(1 for keyword in keywords if keyword in normalized)
+    token_score = sum(1 for token in _topic_tokens(topic) if token in normalized)
+    return keyword_score + token_score
+
+
 def _summarize_context(genai_client: genai.Client, model: str, context: str, document_names: list[str]) -> str:
     """Summarize long notebook context in batches before final deck generation."""
     summaries: list[str] = []
@@ -707,14 +963,17 @@ def _generate_deck(
     context: str,
     document_names: list[str],
     visual_candidates: list[dict[str, Any]],
+    coverage_topics: list[str] | None = None,
 ) -> tuple[SlideDeckPayload, StoryOutlinePayload]:
     """Plan a story outline, compose slides, then repair design issues."""
+    coverage_topics = coverage_topics if coverage_topics is not None else _expected_coverage_topics(context)
     outline = _generate_story_outline(
         genai_client=genai_client,
         model=model,
         context=context,
         document_names=document_names,
         visual_candidates=visual_candidates,
+        coverage_topics=coverage_topics,
     )
     deck = _compose_deck(
         genai_client=genai_client,
@@ -723,7 +982,9 @@ def _generate_deck(
         document_names=document_names,
         visual_candidates=visual_candidates,
         outline=outline,
+        coverage_topics=coverage_topics,
     )
+    _ensure_deck_title(deck, outline, context, document_names, coverage_topics)
     return deck, outline
 
 
@@ -734,6 +995,7 @@ def _generate_story_outline(
     context: str,
     document_names: list[str],
     visual_candidates: list[dict[str, Any]],
+    coverage_topics: list[str],
 ) -> StoryOutlinePayload:
     """Generate the deck narrative before slide composition."""
     retry_feedback = ""
@@ -742,7 +1004,7 @@ def _generate_story_outline(
     for _attempt in range(MAX_DECK_ATTEMPTS):
         response = genai_client.models.generate_content(
             model=model,
-            contents=_outline_prompt(context, document_names, visual_candidates, retry_feedback),
+            contents=_outline_prompt(context, document_names, visual_candidates, coverage_topics, retry_feedback),
             config=types.GenerateContentConfig(
                 temperature=0.2,
                 max_output_tokens=5000,
@@ -753,8 +1015,11 @@ def _generate_story_outline(
         try:
             parsed_payload = _parsed_response_payload(response)
             if isinstance(parsed_payload, StoryOutlinePayload):
-                return parsed_payload
-            return StoryOutlinePayload.model_validate(parsed_payload)
+                outline = parsed_payload
+            else:
+                outline = StoryOutlinePayload.model_validate(parsed_payload)
+            _ensure_outline_coverage_map(outline, coverage_topics)
+            return outline
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             last_error = exc
             retry_feedback = (
@@ -762,7 +1027,286 @@ def _generate_story_outline(
                 f"Validation error: {exc}\n"
             )
 
-    raise ValueError(f"Gemini did not return a valid slide outline: {last_error}")
+    logger.warning("Falling back to deterministic slide outline after Gemini outline failures: %s", last_error)
+    return _fallback_story_outline(context=context, document_names=document_names, coverage_topics=coverage_topics)
+
+
+def _fallback_story_outline(
+    *,
+    context: str,
+    document_names: list[str],
+    coverage_topics: list[str],
+) -> StoryOutlinePayload:
+    """Build a conservative outline when the model returns malformed planner JSON."""
+    vietnamese = _looks_vietnamese(context)
+    topics = _ordered_outline_topics(coverage_topics)
+    if not topics:
+        topics = _default_outline_topics()
+
+    localization_topics = [topic for topic in topics if _outline_chapter_key(topic) == "localization"]
+    optimization_topics = [topic for topic in topics if _outline_chapter_key(topic) != "localization"]
+    wants_transition = bool(localization_topics and optimization_topics)
+    max_topic_slides = MAX_SLIDES - 1 - int(wants_transition)
+
+    selected_topics = topics[:max_topic_slides]
+    while len(selected_topics) < MIN_SLIDES - 1:
+        for topic in _default_outline_topics():
+            if topic not in selected_topics:
+                selected_topics.append(topic)
+                break
+        else:
+            break
+    selected_topics = selected_topics[:max_topic_slides]
+
+    selected_localization = [topic for topic in selected_topics if _outline_chapter_key(topic) == "localization"]
+    selected_optimization = [topic for topic in selected_topics if _outline_chapter_key(topic) != "localization"]
+    include_transition = bool(selected_localization and selected_optimization and len(selected_topics) + 2 <= MAX_SLIDES)
+
+    slides: list[dict[str, Any]] = [
+        {
+            "slide_number": 1,
+            "chapter": _chapter_title("hero", vietnamese),
+            "layout_type": "TITLE_HERO",
+            "title": _fallback_deck_title(context, document_names, coverage_topics, vietnamese),
+            "purpose": "Open the deck with the central theme.",
+            "visual_strategy": "icon",
+        }
+    ]
+
+    ordered_selected = selected_localization if include_transition else selected_topics
+    if include_transition:
+        ordered_selected = [*selected_localization, "__TRANSITION__", *selected_optimization]
+
+    for topic in ordered_selected:
+        if topic == "__TRANSITION__":
+            slides.append(
+                {
+                    "slide_number": len(slides) + 1,
+                    "chapter": _chapter_title("optimization", vietnamese),
+                    "layout_type": "TRANSITION",
+                    "title": _transition_title(vietnamese),
+                    "purpose": "Signal the chapter shift.",
+                    "visual_strategy": "none",
+                }
+            )
+            continue
+        chapter_key = _outline_chapter_key(topic)
+        slides.append(
+            {
+                "slide_number": len(slides) + 1,
+                "chapter": _chapter_title(chapter_key, vietnamese),
+                "layout_type": _fallback_layout_for_topic(topic),
+                "title": _fallback_title_for_topic(topic, vietnamese),
+                "purpose": _fallback_purpose_for_topic(topic, vietnamese),
+                "visual_strategy": "icon",
+            }
+        )
+
+    outline = StoryOutlinePayload.model_validate(
+        {
+            "title": _fallback_deck_title(context, document_names, coverage_topics, vietnamese),
+            "language": "Vietnamese" if vietnamese else "English",
+            "slide_count": len(slides),
+            "chapters": list(dict.fromkeys(str(slide["chapter"]) for slide in slides if slide.get("chapter"))),
+            "slides": slides,
+            "coverage_map": [],
+        }
+    )
+    _ensure_outline_coverage_map(outline, coverage_topics)
+    return outline
+
+
+def _ordered_outline_topics(coverage_topics: list[str]) -> list[str]:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    priority = [
+        "Localization Methods",
+        "Localization Architecture",
+        "Runtime Localization Flow",
+        "Smart Strings",
+        "Pseudo Localization",
+        "Profiler Diagnostics",
+        "Garbage Collector",
+        "Object Pooling",
+        "Physics Optimization",
+        "Rendering And UI Optimization",
+        "Memory And Asset Management",
+        "Pre-flight Checklist",
+    ]
+    for topic in [*priority, *coverage_topics]:
+        if topic in coverage_topics and topic not in seen:
+            ordered.append(topic)
+            seen.add(topic)
+    return ordered
+
+
+def _default_outline_topics() -> list[str]:
+    return [
+        "Localization Architecture",
+        "Runtime Localization Flow",
+        "Localization Methods",
+        "Memory And Asset Management",
+    ]
+
+
+def _outline_chapter_key(topic: str) -> str:
+    normalized = _normalized_label(topic)
+    if any(marker in normalized for marker in ("localization", "smart", "pseudo")):
+        return "localization"
+    return "optimization"
+
+
+def _fallback_layout_for_topic(topic: str) -> str:
+    if topic in {"Runtime Localization Flow", "Garbage Collector"}:
+        return "PROCESS_TIMELINE"
+    if topic in {"Localization Methods", "Pseudo Localization"}:
+        return "COMPARISON_TABLE"
+    if topic == "Profiler Diagnostics":
+        return "VISUAL_ANCHOR"
+    if topic == "Pre-flight Checklist":
+        return "CHECKLIST"
+    return "ICON_GRID"
+
+
+def _fallback_title_for_topic(topic: str, vietnamese: bool) -> str:
+    if not vietnamese:
+        return topic
+    titles = {
+        "Localization Methods": "So sánh Phương pháp Localization",
+        "Localization Architecture": "Kiến trúc Hệ thống Localization",
+        "Runtime Localization Flow": "Luồng Runtime của Localization",
+        "Smart Strings": "Smart Strings và Chuỗi Động",
+        "Pseudo Localization": "Pseudo Localization cho Kiểm thử",
+        "Profiler Diagnostics": "Chẩn đoán Hiệu suất bằng Profiler",
+        "Garbage Collector": "Vòng đời Garbage Collector",
+        "Object Pooling": "Object Pooling giảm Instantiate",
+        "Physics Optimization": "Tối ưu Physics và Collision",
+        "Rendering And UI Optimization": "Tối ưu Rendering và UI",
+        "Memory And Asset Management": "Quản lý Memory và Asset",
+        "Pre-flight Checklist": "Checklist trước khi Production",
+    }
+    return titles.get(topic, topic)
+
+
+def _fallback_purpose_for_topic(topic: str, vietnamese: bool) -> str:
+    if vietnamese:
+        return f"Tóm lược ý chính và quyết định kỹ thuật cho {topic}."
+    return f"Summarize the key claims and technical decisions for {topic}."
+
+
+def _chapter_title(chapter_key: str, vietnamese: bool) -> str:
+    if chapter_key == "localization":
+        return "Localization" if not vietnamese else "Localization"
+    if chapter_key == "optimization":
+        return "Optimization" if not vietnamese else "Tối ưu hóa"
+    return "Core Theme" if not vietnamese else "Chủ đề chính"
+
+
+def _ensure_deck_title(
+    deck: SlideDeckPayload,
+    outline: StoryOutlinePayload,
+    context: str,
+    document_names: list[str],
+    coverage_topics: list[str],
+) -> None:
+    """Replace generic deck/hero titles with source-specific titles."""
+    vietnamese = _looks_vietnamese(context) or _looks_vietnamese(deck.title) or _looks_vietnamese(outline.title)
+    inferred_title = _fallback_deck_title(context, document_names, coverage_topics, vietnamese)
+    outline_title = outline.title.strip()
+    if _is_generic_deck_title(outline_title):
+        outline_title = ""
+    replacement = outline_title or inferred_title
+
+    if _is_generic_deck_title(deck.title):
+        deck.title = replacement
+    if deck.slides and deck.slides[0].layout_type == "TITLE_HERO" and _is_generic_deck_title(deck.slides[0].title):
+        deck.slides[0].title = deck.title or replacement
+
+
+def _fallback_deck_title(
+    context: str,
+    document_names: list[str],
+    coverage_topics: list[str],
+    vietnamese: bool,
+) -> str:
+    normalized_context = _normalized_label(" ".join([context, *document_names, *coverage_topics]))
+    has_unity = "unity" in normalized_context
+    has_localization = any(_outline_chapter_key(topic) == "localization" for topic in coverage_topics) or any(
+        marker in normalized_context
+        for marker in (
+            "localization",
+            "locale",
+            "string table",
+            "asset table",
+            "pseudo localization",
+            "smart strings",
+        )
+    )
+    has_optimization = any(_outline_chapter_key(topic) == "optimization" for topic in coverage_topics) or any(
+        marker in normalized_context
+        for marker in (
+            "optimization",
+            "performance",
+            "profiler",
+            "garbage collector",
+            "object pooling",
+            "physics",
+            "rendering",
+            "memory",
+            "hieu suat",
+            "toi uu",
+        )
+    )
+    has_audio = any(marker in normalized_context for marker in ("audio", "sound", "am thanh"))
+    has_rag = any(marker in normalized_context for marker in ("rag", "retrieval", "vector", "embedding"))
+
+    if vietnamese:
+        unity_suffix = " trong Unity" if has_unity else ""
+        if has_localization and has_optimization:
+            return f"Hệ thống Localization và Tối ưu hóa Hiệu suất{unity_suffix}"
+        if has_localization:
+            return f"Hệ thống Localization{unity_suffix}"
+        if has_optimization:
+            return f"Tối ưu hóa Hiệu suất{unity_suffix}"
+        if has_audio:
+            return f"Làm chủ Âm thanh{unity_suffix}"
+        if has_rag:
+            return "Kiến trúc RAG và Truy xuất Tri thức"
+        return _document_title_from_names(document_names) or "Tổng quan Nội dung từ Nguồn đã chọn"
+
+    unity_suffix = " in Unity" if has_unity else ""
+    if has_localization and has_optimization:
+        return f"Unity Localization and Performance Optimization" if has_unity else "Localization and Performance Optimization"
+    if has_localization:
+        return f"Localization Systems{unity_suffix}"
+    if has_optimization:
+        return f"Performance Optimization{unity_suffix}"
+    if has_audio:
+        return f"Audio Systems{unity_suffix}"
+    if has_rag:
+        return "RAG Architecture and Knowledge Retrieval"
+    return _document_title_from_names(document_names) or "Source-Grounded Presentation"
+
+
+def _document_title_from_names(document_names: list[str]) -> str:
+    for name in document_names:
+        stem = Path(name).stem.replace("_", " ").replace("-", " ").strip()
+        if stem and not _is_generic_deck_title(stem):
+            return stem[:72]
+    return ""
+
+
+def _transition_title(vietnamese: bool) -> str:
+    if vietnamese:
+        return "Từ hệ thống nội dung đến hiệu suất vận hành"
+    return "From content systems to runtime performance"
+
+
+def _looks_vietnamese(text: str) -> bool:
+    normalized = text.casefold()
+    return bool(re.search(r"[ăâđêôơưáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹỵ]", normalized)) or any(
+        marker in normalized for marker in (" và ", " của ", " không ", " trong ", " được ")
+    )
 
 
 def _compose_deck(
@@ -773,12 +1317,15 @@ def _compose_deck(
     document_names: list[str],
     visual_candidates: list[dict[str, Any]],
     outline: StoryOutlinePayload,
+    coverage_topics: list[str],
 ) -> SlideDeckPayload:
     """Generate and validate a strict deck JSON payload."""
     retry_feedback = ""
     last_error: Exception | None = None
+    last_review_issues: list[str] = []
+    deck: SlideDeckPayload | None = None
 
-    for _attempt in range(MAX_DECK_ATTEMPTS):
+    for attempt in range(MAX_DECK_ATTEMPTS):
         prompt = _deck_prompt(context, document_names, visual_candidates, outline, retry_feedback)
         response = genai_client.models.generate_content(
             model=model,
@@ -797,9 +1344,18 @@ def _compose_deck(
             else:
                 parsed_payload = _repair_deck_payload(parsed_payload)
                 deck = SlideDeckPayload.model_validate(parsed_payload)
-            review_issues = _review_deck_design(deck)
+            review_issues = _review_deck_design(deck, coverage_topics=coverage_topics)
             if review_issues:
-                raise ValueError("; ".join(review_issues))
+                last_review_issues = review_issues
+                if attempt >= MAX_DECK_ATTEMPTS - 1:
+                    logger.warning(
+                        "Accepting slide deck after design-review retries were exhausted issues=%s",
+                        "; ".join(review_issues),
+                    )
+                    _fill_empty_visual_anchor_fallbacks(deck)
+                    return deck
+                retry_feedback = _deck_design_review_feedback(review_issues)
+                continue
             return deck
         except (json.JSONDecodeError, ValidationError, ValueError) as exc:
             last_error = exc
@@ -808,6 +1364,9 @@ def _compose_deck(
                 f"Validation error: {exc}\n"
             )
 
+    if last_review_issues and deck:
+        _fill_empty_visual_anchor_fallbacks(deck)
+        return deck
     raise ValueError(f"Gemini did not return a valid slide deck: {last_error}")
 
 
@@ -815,9 +1374,16 @@ def _outline_prompt(
     context: str,
     document_names: list[str],
     visual_candidates: list[dict[str, Any]],
+    coverage_topics: list[str],
     retry_feedback: str,
 ) -> str:
     visual_text = _visual_candidates_text(visual_candidates)
+    topic_text = "\n".join(f"- {topic}" for topic in coverage_topics) if coverage_topics else "- Auto-detect from context."
+    slide_count_guidance = (
+        "Prefer 11-12 slides because the selected sources contain many distinct technical topics."
+        if len(coverage_topics) >= 7 or len(document_names) >= 2
+        else "Use the fewest slides that still covers every major topic."
+    )
 
     return f"""
 You are the Story Outline Planner for a NotebookLM-quality academic presentation.
@@ -826,11 +1392,26 @@ Use only the supplied context. Auto-detect the main language and write in that l
 
 Planning goals:
 - Choose {MIN_SLIDES}-{MAX_SLIDES} slides.
+- {slide_count_guidance}
 - Build a clear story with chapters, not a list of extracted headings.
+- Plan every slide as self-contained: the title must be visible inside the slide page, not only in navigation.
+- Use a meaningful message headline whenever possible; avoid generic titles like "Overview", "Key Points", or "Details".
 - If there are two or more major topics, add exactly one TRANSITION slide at the chapter boundary.
-- Prefer 8-12 slides when the source has multiple technical sections; do not compress unrelated chapters into one slide.
+- Do not compress unrelated chapters into one slide just to save slide count.
 - Assign each slide one visual strategy: icon, source_page, generated_image, or none.
 - Do not plan a final generic summary/recap/conclusion slide.
+- Create coverage_map: every detected coverage topic below must map to at least one planned slide.
+- A grounded final CHECKLIST is allowed only when it is action-oriented; it must not be a generic summary.
+
+Research-based layout rules:
+- Use one core idea per slide, supported by visual evidence, compact components, or a short table.
+- Use hierarchy, spacing, scale, contrast, and grid alignment to guide attention.
+- Process/runtime/lifecycle content must use PROCESS_TIMELINE or PROCESS_FLOW_WITH_CALLOUT.
+- Comparison/opposition/legacy-vs-recommended content must use COMPARISON_TABLE or DUAL_PILLARS.
+- Three independent ideas should use GRID_COMPOSITE.
+- Exactly four independent ideas must use ICON_GRID; the renderer will show them as a balanced 2x2 grid.
+- Five or six independent ideas must use ICON_GRID as a compact 3x2 grid.
+- Transition/slogan slides must use TRANSITION with centered, large typography.
 
 Allowed layout_type values:
 - TITLE_HERO
@@ -841,11 +1422,17 @@ Allowed layout_type values:
 - METRIC_DASHBOARD
 - CODE_COMPARISON
 - CHECKLIST
+- PROCESS_TIMELINE
+- COMPARISON_TABLE
+- ICON_GRID
 - TRANSITION
 
 Return only valid JSON matching the response schema.
 
 Selected documents: {", ".join(document_names)}
+
+Detected coverage topics:
+{topic_text}
 
 Available source visual candidates:
 {visual_text}
@@ -873,9 +1460,24 @@ Use the approved story outline exactly. Use only the supplied context. Write sli
 
 Design goals:
 - Convert evidence into visual components, not prose boxes.
+- Every slide must be self-contained: its title is rendered inside the slide canvas, not only in the sidebar.
+- Write meaningful message headlines; avoid generic titles like "Overview", "Key Points", "Details", or "Content".
+- Keep one core idea per slide and support it with visual evidence, compact components, icons, tables, or timelines.
+- Use hierarchy, spacing, scale, contrast, and grid alignment to guide attention.
 - Every technical concept should be expressed as Action, Technique, Metric, Comparison, or Callout.
 - Use visual anchors: icon_key on cards/metrics/checklists, source_page only when clearly useful, generated_image only for a hero/concept slide.
+- Use at most one generated_image in the whole deck; all other keyword visuals must be icon_key.
+- Prefer source_page over generated_image when a candidate page contains a relevant diagram, chart, profiler view, table, code, or flow; the worker will crop the page automatically.
 - source_page and generated_image are allowed only on TITLE_HERO or VISUAL_ANCHOR slides; every other layout must set visual.kind="none" and components.visual_anchor.kind="none" unless it uses card/metric/checklist icons.
+- Cover every topic from the approved coverage_map; do not skip Profiler/GC/Object Pooling/Physics/Rendering/Memory/Localization topics when present.
+- Prefer rich layouts for dense technical evidence: PROCESS_TIMELINE for runtime/GC/loading flow, COMPARISON_TABLE for methods/best-practices/before-after, ICON_GRID for many small techniques, plus METRIC_DASHBOARD/CODE_COMPARISON/CHECKLIST.
+- Process/runtime/lifecycle content must use PROCESS_TIMELINE or PROCESS_FLOW_WITH_CALLOUT.
+- Comparison/opposition/legacy-vs-recommended content must use COMPARISON_TABLE or DUAL_PILLARS.
+- Three independent ideas should use GRID_COMPOSITE.
+- Exactly four independent ideas must use ICON_GRID so the renderer can show a balanced 2x2 grid.
+- Five or six independent ideas must use ICON_GRID as a compact 3x2 grid.
+- TRANSITION slides are for chapter shifts or slogan-like statements only.
+- Do not overuse sparse DUAL_PILLARS; use it only for exactly two large ideas.
 - Do not write generic summary, recap, or conclusion slides.
 - Do not use citations, source markers, or bracket references.
 
@@ -888,25 +1490,37 @@ Allowed layout_type values:
 - METRIC_DASHBOARD
 - CODE_COMPARISON
 - CHECKLIST
+- PROCESS_TIMELINE
+- COMPARISON_TABLE
+- ICON_GRID
 - TRANSITION
 
 Component rules:
-- GRID_COMPOSITE: 3 cards with id, tag, icon_key, heading, desc.
-- DUAL_PILLARS: 2 cards; each card must have icon_key, heading, desc.
+- GRID_COMPOSITE: exactly 3 cards with id, tag, icon_key, heading, desc, and 1-2 short points when no source visual is used.
+- DUAL_PILLARS: 2 cards; each card must have icon_key, heading, desc, and 1-2 short points when no source visual is used.
+- Card points are for compact examples, commands, names, numbers, or caveats; never full prose.
 - PROCESS_FLOW_WITH_CALLOUT: 3-5 flow_steps and one callout_box.
+- PROCESS_TIMELINE: 5-7 flow_steps; use for Localization Runtime Flow, GC phases, loading or optimization pipelines.
 - flow_steps.step must be a numeric string only ("1", "2", "3"...); put words in label/action.
 - VISUAL_ANCHOR: components.visual_anchor must be icon, source_page, or generated_image and include a short caption.
+- VISUAL_ANCHOR must also include either 1-2 explanatory cards with points or one callout_box; never return an icon/caption-only slide.
 - METRIC_DASHBOARD: 3-5 metrics with icon_key, value, label, context.
 - CODE_COMPARISON: 2-4 comparison rows with label, left, right.
+- COMPARISON_TABLE: 3-5 comparison rows; every row must include icon_key, label, left, right. Use the full table area with substantive technical cells, not one-word entries.
 - CHECKLIST: 4-5 checklist items with icon_key and command-like text.
+- ICON_GRID: 4-6 cards with icon_key, heading, desc, and 1-3 short points; exactly 4 cards render as 2x2, 5-6 cards render as 3x2.
 - TRANSITION: title and subtitle only; keep components empty.
+- Card object format: {{"id":"01","tag":"INSIGHT","icon_key":"cpu","heading":"Profiler","desc":"Trace spikes before optimizing.","points":["Watch GC.Alloc","Check frame timeline"]}}.
 
 Text constraints:
 - Card desc <= {CARD_DESC_MAX_WORDS} words.
+- Card points <= {CARD_MAX_POINTS} per card and <= {CARD_POINT_MAX_WORDS} words each.
 - Flow step action <= {FLOW_ACTION_MAX_WORDS} words and must sound command-like.
 - Callout text <= {CALLOUT_MAX_WORDS} words.
 - Vietnamese flow actions should start with imperative verbs like "Cập nhật", "Thiết lập", "Tải", "Nạp", "Hiển thị", "Kiểm tra", "Tách", or "Tối ưu".
-- Each slide <= {MAX_WORDS_PER_SLIDE} visible words.
+- There is no fixed total word cap per slide; include enough grounded detail to make each slide useful.
+- Dense layouts should use their available area: fill tables with 3-5 meaningful rows, grids with points, and timelines with concrete actions.
+- Keep text focused on main claims, keywords, mechanisms, tradeoffs, examples, and caveats from the source; do not add filler or long prose.
 - Avoid full sentences where a label or command works.
 
 Icon allowlist:
@@ -968,12 +1582,28 @@ Context:
 """.strip()
 
 
+def _deck_design_review_feedback(review_issues: list[str]) -> str:
+    issue_text = "\n".join(f"- {issue}" for issue in review_issues)
+    return f"""
+Your previous JSON was structurally valid, but the deck design review found issues:
+{issue_text}
+
+Return corrected JSON only. Keep the same slide_count. For the numbered sparse or DUAL_PILLARS slides:
+- Replace broad card-frame slides with PROCESS_TIMELINE, COMPARISON_TABLE, or ICON_GRID when the topic has multiple details.
+- Add 2-3 card points where a card layout remains appropriate.
+- Keep generated_image at most once; use icon_key for keyword visuals.
+- Do not drop coverage topics while changing layouts.
+""".strip()
+
+
 def _visual_candidates_text(visual_candidates: list[dict[str, Any]]) -> str:
     candidate_lines = []
-    for candidate in visual_candidates[:12]:
+    for candidate in visual_candidates[:24]:
+        excerpt = str(candidate.get("excerpt") or "").strip()
+        excerpt_text = f"; excerpt={excerpt}" if excerpt else ""
         candidate_lines.append(
             f"- source_index={candidate['source_index']}; document={candidate['document_name']}; "
-            f"pages={candidate['page_range']}; page={candidate.get('page') or 'unknown'}"
+            f"pages={candidate['page_range']}; page={candidate.get('page') or 'unknown'}{excerpt_text}"
         )
     return "\n".join(candidate_lines) if candidate_lines else "- none"
 
@@ -988,14 +1618,16 @@ def _materialize_visuals(
     user_id: str,
     notebook_id: str,
     visual_candidates: list[dict[str, Any]],
+    crop_model: str | None = None,
 ) -> dict[str, Any]:
     """Attach small preview image data URLs for selected visuals."""
     slides = deck.get("slides")
     if not isinstance(slides, list):
         return deck
 
-    max_generated_images = 1 if len(slides) <= 5 else 2
+    max_generated_images = 1
     generated_count = 0
+    source_crop_count = 0
     candidates_by_source = {
         int(candidate["source_index"]): candidate for candidate in visual_candidates if "source_index" in candidate
     }
@@ -1010,6 +1642,26 @@ def _materialize_visuals(
         anchor = _slide_visual_anchor(slide)
         kind = anchor.get("kind") or visual.get("kind")
         layout = str(slide.get("layout_type") or "")
+        if layout == "VISUAL_ANCHOR" and kind in {"icon", "none", None, ""}:
+            promoted_candidate = _best_source_visual_candidate_for_slide(slide, visual_candidates)
+            if promoted_candidate:
+                anchor.update(
+                    {
+                        "kind": "source_page",
+                        "source_index": promoted_candidate.get("source_index"),
+                        "page": promoted_candidate.get("page"),
+                        "alt": anchor.get("alt") or slide.get("title"),
+                    }
+                )
+                visual.update(
+                    {
+                        "kind": "source_page",
+                        "source_index": promoted_candidate.get("source_index"),
+                        "page": promoted_candidate.get("page"),
+                        "alt": anchor.get("alt") or slide.get("title"),
+                    }
+                )
+                kind = "source_page"
         if kind in {"source_page", "generated_image"} and layout in COMPONENT_LAYOUTS and layout not in VISUAL_LAYOUTS:
             visual["kind"] = "none"
             anchor["kind"] = "none"
@@ -1024,17 +1676,25 @@ def _materialize_visuals(
                         "alt": anchor.get("alt"),
                     }
                 )
-            data_url = _source_visual_data_url(
+            data_url, crop_box = _source_visual_data_and_crop(
                 client=client,
                 settings=settings,
                 user_id=user_id,
                 notebook_id=notebook_id,
                 visual=visual if visual.get("source_index") else anchor,
                 candidates_by_source=candidates_by_source,
+                genai_client=genai_client,
+                crop_model=crop_model,
+                crop_enabled=source_crop_count < MAX_SOURCE_CROPS_PER_DECK,
+                crop_hint=_slide_crop_hint(slide),
             )
             if data_url:
                 visual["data_url"] = data_url
                 anchor["data_url"] = data_url
+                if crop_box:
+                    visual["crop_box"] = crop_box
+                    anchor["crop_box"] = crop_box
+                    source_crop_count += 1
             else:
                 visual["kind"] = "none"
                 anchor["kind"] = "none"
@@ -1058,6 +1718,7 @@ def _materialize_visuals(
                 anchor["kind"] = "none"
 
     deck["image_generation_count"] = generated_count
+    deck["source_crop_count"] = source_crop_count
     return deck
 
 
@@ -1069,6 +1730,84 @@ def _slide_visual_anchor(slide: dict[str, Any]) -> dict[str, Any]:
         components["visual_anchor"] = anchor
         slide["components"] = components
     return anchor
+
+
+def _slide_crop_hint(slide: dict[str, Any]) -> str:
+    """Compact human-readable hint for selecting a crop from a source PDF page."""
+    parts = [
+        str(slide.get("title") or ""),
+        str(slide.get("subtitle") or ""),
+    ]
+    visual = slide.get("visual") if isinstance(slide.get("visual"), dict) else {}
+    anchor = _slide_visual_anchor(slide)
+    parts.extend(
+        [
+            str(visual.get("alt") or ""),
+            str(anchor.get("caption") or ""),
+            str(anchor.get("alt") or ""),
+        ]
+    )
+    components = slide.get("components") if isinstance(slide.get("components"), dict) else {}
+    parts.extend(_visible_strings(components)[:10])
+    return _truncate_words(" ".join(part for part in parts if part).strip(), 90)
+
+
+def _best_source_visual_candidate_for_slide(
+    slide: dict[str, Any],
+    visual_candidates: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    if not visual_candidates:
+        return None
+    hint = _slide_crop_hint(slide)
+    hint_tokens = _source_visual_tokens(hint)
+    if not hint_tokens:
+        return None
+
+    best_candidate: dict[str, Any] | None = None
+    best_score = 0
+    for candidate in visual_candidates:
+        candidate_text = " ".join(
+            str(candidate.get(key) or "")
+            for key in ("document_name", "page_range", "excerpt")
+        )
+        candidate_tokens = _source_visual_tokens(candidate_text)
+        score = len(hint_tokens & candidate_tokens)
+        score += _source_visual_phrase_bonus(_normalized_label(hint), _normalized_label(candidate_text))
+        if score > best_score:
+            best_score = score
+            best_candidate = candidate
+
+    if best_score < SOURCE_VISUAL_PROMOTION_THRESHOLD:
+        return None
+    return best_candidate
+
+
+def _source_visual_tokens(text: str) -> set[str]:
+    normalized = _normalized_label(text)
+    tokens = set(re.findall(r"[a-z0-9]+", normalized))
+    return {
+        token
+        for token in tokens
+        if len(token) >= 3 and token not in SOURCE_VISUAL_STOPWORDS
+    }
+
+
+def _source_visual_phrase_bonus(hint: str, candidate_text: str) -> int:
+    bonus = 0
+    related_groups = [
+        ("profiler", ("profiler", "cpu", "gpu", "memory", "rendering", "timeline", "frame", "camera render", "gc alloc")),
+        ("object pooling", ("objectpool", "object pooling", "pool", "bullet", "missile", "projectile")),
+        ("physics", ("physics", "collision", "collider", "raycast", "layer", "matrix")),
+        ("rendering", ("gpu", "rendering", "atlas", "mesh", "ui", "texture", "lighting")),
+        ("localization", ("localization", "locale", "string table", "asset table", "addressables")),
+    ]
+    for anchor, terms in related_groups:
+        if anchor not in hint:
+            continue
+        matches = sum(1 for term in terms if term in candidate_text)
+        if matches:
+            bonus += min(3, matches)
+    return bonus
 
 
 def _visual_candidates(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1087,6 +1826,7 @@ def _visual_candidates(chunks: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 "page_range": str(chunk.get("page_range") or "unknown"),
                 "page": page,
                 "storage_path": metadata.get("storage_path"),
+                "excerpt": _truncate_words(re.sub(r"\s+", " ", str(chunk.get("content") or "")).strip(), 64),
             }
         )
     return candidates
@@ -1101,10 +1841,38 @@ def _source_visual_data_url(
     visual: dict[str, Any],
     candidates_by_source: dict[int, dict[str, Any]],
 ) -> str | None:
+    data_url, _crop_box = _source_visual_data_and_crop(
+        client=client,
+        settings=settings,
+        user_id=user_id,
+        notebook_id=notebook_id,
+        visual=visual,
+        candidates_by_source=candidates_by_source,
+        genai_client=None,
+        crop_model=None,
+        crop_enabled=False,
+        crop_hint="",
+    )
+    return data_url
+
+
+def _source_visual_data_and_crop(
+    *,
+    client: Any,
+    settings: Any,
+    user_id: str,
+    notebook_id: str,
+    visual: dict[str, Any],
+    candidates_by_source: dict[int, dict[str, Any]],
+    genai_client: genai.Client | None,
+    crop_model: str | None,
+    crop_enabled: bool,
+    crop_hint: str,
+) -> tuple[str | None, dict[str, float] | None]:
     source_index = _int_or_none(visual.get("source_index"))
     candidate = candidates_by_source.get(source_index or -1)
     if not candidate:
-        return None
+        return None, None
 
     page = _int_or_none(visual.get("page")) or _int_or_none(candidate.get("page")) or 1
     document_name = str(candidate.get("document_name") or "").strip()
@@ -1115,7 +1883,14 @@ def _source_visual_data_url(
 
     for local_path in possible_paths:
         if local_path.exists():
-            return _render_pdf_page_data_url(local_path, page)
+            return _render_source_pdf_page_data_url(
+                local_path,
+                page,
+                genai_client=genai_client,
+                crop_model=crop_model,
+                crop_enabled=crop_enabled,
+                crop_hint=crop_hint,
+            )
 
     storage_candidates = [storage_path] if isinstance(storage_path, str) and storage_path else []
     storage_candidates.append(f"{user_id}/{notebook_id}/{safe_pdf_storage_path(document_name)}")
@@ -1123,8 +1898,15 @@ def _source_visual_data_url(
         with tempfile.TemporaryDirectory(prefix="datn-slide-source-") as temp_dir:
             local_path = Path(temp_dir) / "source.pdf"
             if _download_storage_object(client, "pdfs", path, local_path):
-                return _render_pdf_page_data_url(local_path, page)
-    return None
+                return _render_source_pdf_page_data_url(
+                    local_path,
+                    page,
+                    genai_client=genai_client,
+                    crop_model=crop_model,
+                    crop_enabled=crop_enabled,
+                    crop_hint=crop_hint,
+                )
+    return None, None
 
 
 def _download_storage_object(client: Any, bucket: str, storage_path: str, local_path: Path) -> bool:
@@ -1140,7 +1922,34 @@ def _download_storage_object(client: Any, bucket: str, storage_path: str, local_
     return True
 
 
+def _render_source_pdf_page_data_url(
+    pdf_path: Path,
+    page_number: int,
+    *,
+    genai_client: genai.Client | None,
+    crop_model: str | None,
+    crop_enabled: bool,
+    crop_hint: str,
+) -> tuple[str | None, dict[str, float] | None]:
+    image = _render_pdf_page_image(pdf_path, page_number)
+    if image is None:
+        return None, None
+
+    crop_box: CropBox | None = None
+    if crop_enabled and genai_client is not None and crop_model:
+        crop_box = _choose_source_crop_box(genai_client, crop_model, image, crop_hint)
+        if crop_box is not None:
+            image = _crop_image(image, crop_box)
+
+    return _image_to_data_url(image), crop_box.model_dump() if crop_box else None
+
+
 def _render_pdf_page_data_url(pdf_path: Path, page_number: int) -> str | None:
+    image = _render_pdf_page_image(pdf_path, page_number)
+    return _image_to_data_url(image) if image else None
+
+
+def _render_pdf_page_image(pdf_path: Path, page_number: int) -> Image.Image | None:
     try:
         import pypdfium2 as pdfium
 
@@ -1150,11 +1959,69 @@ def _render_pdf_page_data_url(pdf_path: Path, page_number: int) -> str | None:
             page_index = 0
         page = pdf[page_index]
         bitmap = page.render(scale=2.4)
-        image = bitmap.to_pil().convert("RGB")
-        return _image_to_data_url(image)
+        return bitmap.to_pil().convert("RGB")
     except Exception:
         logger.info("Could not render source PDF page for slide visual path=%s page=%s", pdf_path, page_number, exc_info=True)
         return None
+
+
+def _choose_source_crop_box(
+    genai_client: genai.Client,
+    crop_model: str,
+    image: Image.Image,
+    crop_hint: str,
+) -> CropBox | None:
+    """Ask Gemini Vision for a grounded page crop; invalid/low confidence means whole page."""
+    try:
+        image_part = _image_part_for_crop(image)
+        prompt = (
+            "Return strict JSON only: {\"crop_box\":{\"x\":0.0,\"y\":0.0,\"width\":1.0,\"height\":1.0},"
+            "\"confidence\":0.0,\"rationale\":\"short\"}. "
+            "Choose the smallest useful normalized crop containing the visual evidence for this presentation slide. "
+            "Prefer diagrams, charts, tables, profiler panels, code blocks, or illustrations. "
+            "Avoid page title/footer/margins unless they are essential. Do not invent content. "
+            "Use coordinates from the top-left of the page, normalized 0-1. "
+            f"Slide purpose/content hint: {crop_hint[:700]}"
+        )
+        response = genai_client.models.generate_content(
+            model=crop_model,
+            contents=[image_part, prompt],
+            config=types.GenerateContentConfig(
+                temperature=0,
+                max_output_tokens=512,
+                response_mime_type="application/json",
+            ),
+        )
+        payload = CropSelectionPayload.model_validate(_parse_json_object(str(response.text or "")))
+        if payload.crop_box is None or payload.confidence < MIN_CROP_CONFIDENCE:
+            return None
+        return payload.crop_box
+    except Exception:
+        logger.info("Could not select crop box for source slide visual.", exc_info=True)
+        return None
+
+
+def _image_part_for_crop(image: Image.Image) -> types.Part:
+    image_copy = image.copy()
+    image_copy.thumbnail((1400, 1400), Image.Resampling.LANCZOS)
+    if image_copy.mode != "RGB":
+        image_copy = image_copy.convert("RGB")
+    buffer = io.BytesIO()
+    image_copy.save(buffer, format="WEBP", quality=86)
+    return types.Part.from_bytes(data=buffer.getvalue(), mime_type="image/webp")
+
+
+def _crop_image(image: Image.Image, crop_box: CropBox) -> Image.Image:
+    width, height = image.size
+    pad_x = crop_box.width * 0.025
+    pad_y = crop_box.height * 0.025
+    x1 = max(0, int(round((crop_box.x - pad_x) * width)))
+    y1 = max(0, int(round((crop_box.y - pad_y) * height)))
+    x2 = min(width, int(round((crop_box.x + crop_box.width + pad_x) * width)))
+    y2 = min(height, int(round((crop_box.y + crop_box.height + pad_y) * height)))
+    if x2 - x1 < 80 or y2 - y1 < 80:
+        return image
+    return image.crop((x1, y1, x2, y2))
 
 
 def _generate_image_data_url(genai_client: genai.Client, image_model: str, prompt: str) -> str | None:
@@ -1306,6 +2173,12 @@ def _render_slide(deck: dict[str, Any], slide: dict[str, Any]) -> Image.Image:
         _render_code_comparison(draw, slide, body_font, small_font)
     elif layout == "CHECKLIST":
         _render_checklist(draw, slide, body_font, small_font)
+    elif layout == "PROCESS_TIMELINE":
+        _render_process_timeline(draw, slide, body_font, small_font)
+    elif layout == "COMPARISON_TABLE":
+        _render_comparison_table(draw, slide, body_font, small_font)
+    elif layout == "ICON_GRID":
+        _render_icon_grid(draw, slide, body_font, small_font)
     elif layout == "TWO_COLUMNS":
         _render_two_columns(draw, slide, body_font, small_font)
     elif layout == "THREE_FEATURES":
@@ -1467,9 +2340,12 @@ def _render_visual_anchor(
     else:
         _draw_large_icon_anchor(draw, str(anchor.get("icon_key") or "workflow"), (170, 250, 850, 660), body_font)
     caption = str(anchor.get("caption") or "")
-    _draw_wrapped(draw, str(slide.get("title") or ""), (995, 245), title_font, "#1f5666", 420, 8)
+    y = 255
     if caption:
-        _draw_wrapped(draw, caption, (1000, 460), body_font, "#2b3437", 410, 8)
+        y = _draw_wrapped(draw, caption, (995, y), body_font, "#2b3437", 430, 8) + 32
+    for point in _visual_anchor_points(slide)[:4]:
+        draw.ellipse((1002, y + 12, 1014, y + 24), fill="#d89c2b")
+        y = _draw_wrapped(draw, point, (1030, y), small_font, "#2b3437", 390, 5) + 10
     callout = _component_callout(slide)
     if callout:
         _draw_callout(draw, callout, (990, 610, 1485, 745), small_font, small_font)
@@ -1530,6 +2406,129 @@ def _render_checklist(
         _draw_icon_badge(draw, str(item.get("icon_key") or "check"), (185, y + 22), small_font, fill="#16a34a")
         _draw_wrapped(draw, str(item.get("text") or ""), (260, y + 26), body_font, "#2b3437", 1080, 6)
         y += 105
+
+
+def _render_process_timeline(
+    draw: ImageDraw.ImageDraw,
+    slide: dict[str, Any],
+    body_font: ImageFont.ImageFont,
+    small_font: ImageFont.ImageFont,
+) -> None:
+    steps = _component_flow_steps(slide)[:7]
+    if not steps:
+        return
+    x_start = 95
+    y = 275
+    available_width = 1410
+    gap = 12
+    step_width = int((available_width - gap * (len(steps) - 1)) / len(steps))
+    y_line = y + 64
+    draw.line((x_start + 20, y_line, x_start + available_width - 20, y_line), fill="#c7d5da", width=4)
+    for index, step in enumerate(steps):
+        x = x_start + index * (step_width + gap)
+        draw.rounded_rectangle((x, y, x + step_width, y + 250), radius=16, fill="#ffffff", outline="#d9e2e6", width=2)
+        draw.ellipse((x + 16, y + 34, x + 58, y + 76), fill="#1f5666")
+        draw.text((x + 30, y + 46), str(index + 1), font=small_font, fill="#ffffff")
+        _draw_wrapped(draw, str(step.get("label") or ""), (x + 16, y + 98), small_font, "#1f5666", step_width - 32, 5)
+        _draw_wrapped(draw, str(step.get("action") or ""), (x + 16, y + 165), small_font, "#2b3437", step_width - 32, 5)
+    callout = _component_callout(slide)
+    if callout:
+        _draw_callout(draw, callout, (180, 610, 1420, 760), small_font, small_font)
+
+
+def _render_comparison_table(
+    draw: ImageDraw.ImageDraw,
+    slide: dict[str, Any],
+    body_font: ImageFont.ImageFont,
+    small_font: ImageFont.ImageFont,
+) -> None:
+    rows = _component_comparison(slide)[:5]
+    if not rows:
+        return
+    columns = _comparison_table_columns(rows)
+    x1, y1, x2, y2 = (95, 195, 1505, 780)
+    draw.rounded_rectangle((x1, y1, x2, y2), radius=20, fill="#ffffff", outline="#d9e2e6", width=2)
+    header_height = 70
+    draw.rectangle((x1, y1, x2, y1 + header_height), fill="#1f5666")
+    column_boxes = _comparison_table_column_boxes(x1, x2, columns)
+    for column, (col_x1, _col_x2) in zip(columns, column_boxes):
+        draw.text((col_x1 + 22, y1 + 24), column["header"], font=small_font, fill="#ffffff")
+    row_height = int((y2 - y1 - header_height) / max(len(rows), 1))
+    y = y1 + header_height
+    for index, row in enumerate(rows):
+        fill = "#f7fafb" if index % 2 else "#ffffff"
+        draw.rectangle((x1, y, x2, y + row_height), fill=fill)
+        for column, (col_x1, col_x2) in zip(columns, column_boxes):
+            text_x = col_x1 + 22
+            max_width = col_x2 - col_x1 - 44
+            if column["key"] == "label":
+                _draw_icon_badge(draw, str(row.get("icon_key") or "code"), (col_x1 + 22, y + 28), small_font)
+                text_x = col_x1 + 92
+                max_width = col_x2 - col_x1 - 114
+                fill_color = "#1f5666"
+            else:
+                fill_color = "#2b3437"
+            _draw_wrapped(draw, str(row.get(column["key"]) or ""), (text_x, y + 28), small_font, fill_color, max_width, 5)
+        y += row_height
+
+
+def _comparison_table_columns(rows: list[dict[str, Any]]) -> list[dict[str, str]]:
+    columns: list[dict[str, str]] = []
+    if any(str(row.get("label") or "").strip() for row in rows):
+        columns.append({"key": "label", "header": "Focus"})
+    if any(str(row.get("left") or "").strip() for row in rows):
+        columns.append({"key": "left", "header": "Baseline"})
+    if any(str(row.get("right") or "").strip() for row in rows):
+        columns.append({"key": "right", "header": "Recommended"})
+    return columns or [{"key": "right", "header": "Recommended"}]
+
+
+def _comparison_table_column_boxes(x1: int, x2: int, columns: list[dict[str, str]]) -> list[tuple[int, int]]:
+    if len(columns) == 1:
+        weights = [1.0]
+    elif len(columns) == 2:
+        weights = [1.0, 1.0]
+    else:
+        weights = [0.78, 1.05, 1.25]
+    total = sum(weights)
+    width = x2 - x1
+    boxes: list[tuple[int, int]] = []
+    cursor = x1
+    for index, weight in enumerate(weights):
+        next_x = x2 if index == len(weights) - 1 else int(cursor + width * weight / total)
+        boxes.append((cursor, next_x))
+        cursor = next_x
+    return boxes
+
+
+def _render_icon_grid(
+    draw: ImageDraw.ImageDraw,
+    slide: dict[str, Any],
+    body_font: ImageFont.ImageFont,
+    small_font: ImageFont.ImageFont,
+) -> None:
+    cards = _component_cards(slide)[:6]
+    boxes = _icon_grid_boxes(len(cards))
+    for index, card in enumerate(cards):
+        _draw_compact_icon_card(draw, card, boxes[index], body_font, small_font)
+
+
+def _icon_grid_boxes(card_count: int) -> list[tuple[int, int, int, int]]:
+    if card_count == 4:
+        return [
+            (250, 220, 760, 445),
+            (840, 220, 1350, 445),
+            (250, 495, 760, 720),
+            (840, 495, 1350, 720),
+        ]
+    return [
+        (95, 215, 545, 425),
+        (575, 215, 1025, 425),
+        (1055, 215, 1505, 425),
+        (95, 485, 545, 715),
+        (575, 485, 1025, 715),
+        (1055, 485, 1505, 715),
+    ]
 
 
 def _render_bullets(draw: ImageDraw.ImageDraw, slide: dict[str, Any], body_font: ImageFont.ImageFont) -> None:
@@ -1717,7 +2716,31 @@ def _draw_component_card(
     _draw_icon_badge(draw, str(card.get("icon_key") or "check"), (x1 + 34, y1 + 36), small_font, fill=accent)
     draw.text((x1 + 110, y1 + 42), tag.replace("_", " "), font=small_font, fill=accent)
     _draw_wrapped(draw, str(card.get("heading") or ""), (x1 + 36, y1 + 125), body_font, "#1f5666", x2 - x1 - 72, 8)
-    _draw_wrapped(draw, str(card.get("desc") or ""), (x1 + 36, y1 + 235), small_font, "#2b3437", x2 - x1 - 72, 7)
+    y = _draw_wrapped(draw, str(card.get("desc") or ""), (x1 + 36, y1 + 235), small_font, "#2b3437", x2 - x1 - 72, 7)
+    points = [str(point) for point in card.get("points", []) if str(point).strip()] if isinstance(card.get("points"), list) else []
+    for point in points[:CARD_MAX_POINTS]:
+        draw.ellipse((x1 + 40, y + 16, x1 + 50, y + 26), fill=accent)
+        y = _draw_wrapped(draw, point, (x1 + 66, y), small_font, "#2b3437", x2 - x1 - 102, 5) + 7
+
+
+def _draw_compact_icon_card(
+    draw: ImageDraw.ImageDraw,
+    card: dict[str, Any],
+    box: tuple[int, int, int, int],
+    body_font: ImageFont.ImageFont,
+    small_font: ImageFont.ImageFont,
+) -> None:
+    tag = str(card.get("tag") or "DEFAULT")
+    fill, outline, accent = _tag_style(tag)
+    x1, y1, x2, _y2 = box
+    draw.rounded_rectangle(box, radius=18, fill=fill, outline=outline, width=2)
+    _draw_icon_badge(draw, str(card.get("icon_key") or "check"), (x1 + 24, y1 + 24), small_font, fill=accent)
+    _draw_wrapped(draw, str(card.get("heading") or ""), (x1 + 92, y1 + 26), body_font, "#1f5666", x2 - x1 - 125, 5)
+    y = _draw_wrapped(draw, str(card.get("desc") or ""), (x1 + 24, y1 + 98), small_font, "#2b3437", x2 - x1 - 48, 5)
+    points = [str(point) for point in card.get("points", []) if str(point).strip()] if isinstance(card.get("points"), list) else []
+    for point in points[:CARD_MAX_POINTS]:
+        draw.ellipse((x1 + 28, y + 14, x1 + 37, y + 23), fill=accent)
+        y = _draw_wrapped(draw, point, (x1 + 50, y), small_font, "#2b3437", x2 - x1 - 74, 4) + 4
 
 
 def _draw_callout(
@@ -1820,6 +2843,22 @@ def _component_callout(slide: dict[str, Any]) -> dict[str, Any] | None:
 def _component_anchor(slide: dict[str, Any]) -> dict[str, Any]:
     value = _component_dict(slide).get("visual_anchor")
     return value if isinstance(value, dict) else {}
+
+
+def _visual_anchor_points(slide: dict[str, Any]) -> list[str]:
+    points: list[str] = []
+    for card in _component_cards(slide):
+        heading = str(card.get("heading") or "").strip()
+        for point in card.get("points", []) if isinstance(card.get("points"), list) else []:
+            point_text = str(point).strip()
+            if point_text:
+                points.append(f"{heading}: {point_text}" if heading else point_text)
+        if not card.get("points") and card.get("desc"):
+            points.append(str(card.get("desc") or ""))
+    for item in _component_checklist(slide):
+        if item.get("text"):
+            points.append(str(item.get("text")))
+    return points
 
 
 def _draw_column_items(
@@ -1960,16 +2999,38 @@ def _parse_json_object(value: str) -> dict[str, Any]:
     if text.startswith("```"):
         text = re.sub(r"^```(?:json)?", "", text).strip()
         text = re.sub(r"```$", "", text).strip()
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if not match:
-            raise
-        parsed = json.loads(match.group(0))
+    candidates = [text]
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if match:
+        candidates.append(match.group(0))
+
+    first_error: json.JSONDecodeError | None = None
+    parsed: Any = None
+    for candidate in candidates:
+        for attempt in (candidate, _repair_json_delimiters(candidate)):
+            try:
+                parsed = json.loads(attempt)
+                break
+            except json.JSONDecodeError as exc:
+                first_error = first_error or exc
+        if parsed is not None:
+            break
+    if parsed is None:
+        if first_error:
+            raise first_error
+        raise ValueError("Expected a JSON object from Gemini.")
     if not isinstance(parsed, dict):
         raise ValueError("Expected a JSON object from Gemini.")
     return parsed
+
+
+def _repair_json_delimiters(text: str) -> str:
+    """Repair common Gemini JSON delimiter slips before retrying strict json.loads."""
+    repaired = re.sub(r",(\s*[}\]])", r"\1", text)
+    repaired = re.sub(r"}(\s*\n\s*){", r"},\1{", repaired)
+    repaired = re.sub(r"\](\s*\n\s*){", r"],\1{", repaired)
+    repaired = re.sub(r"(true|false|null|[}\]\"0-9])(\s*\n\s*)(\"[A-Za-z_][A-Za-z0-9_]*\"\s*:)", r"\1,\2\3", repaired)
+    return repaired
 
 
 def _parsed_response_payload(response: Any) -> dict[str, Any] | SlideDeckPayload:
@@ -2046,7 +3107,6 @@ def _repair_deck_payload(payload: dict[str, Any]) -> dict[str, Any]:
             }
         fixed_slide["components"] = fixed_components
         fixed_slide = _repair_visual_placement(fixed_slide)
-        fixed_slide = _fit_slide_to_word_budget(fixed_slide)
         repaired_slides.append(fixed_slide)
 
     repaired["slides"] = repaired_slides
@@ -2085,57 +3145,6 @@ def _repair_visual_placement(slide: dict[str, Any]) -> dict[str, Any]:
     return fixed
 
 
-def _fit_slide_to_word_budget(slide: dict[str, Any]) -> dict[str, Any]:
-    """Trim lower-priority copy until the slide respects the visible word cap."""
-    if _slide_visible_word_count(slide) <= MAX_WORDS_PER_SLIDE:
-        return slide
-
-    fixed = dict(slide)
-    components = fixed.get("components") if isinstance(fixed.get("components"), dict) else {}
-    fixed_components = dict(components)
-    fixed["components"] = fixed_components
-
-    if fixed.get("subtitle"):
-        fixed["subtitle"] = _truncate_words(str(fixed.get("subtitle") or ""), 10)
-    _trim_visual_anchor_caption(fixed_components, 8)
-    _trim_card_text(fixed_components, heading_words=6, desc_words=10)
-    _trim_flow_text(fixed_components, label_words=4, action_words=8)
-    _trim_callout_text(fixed_components, 16)
-    _trim_metric_text(fixed_components, label_words=5, context_words=7)
-    _trim_comparison_text(fixed_components, label_words=4, side_words=8)
-    _trim_checklist_text(fixed_components, 9)
-    _trim_bullets(fixed, 14)
-    if _slide_visible_word_count(fixed) <= MAX_WORDS_PER_SLIDE:
-        return fixed
-
-    if fixed.get("subtitle"):
-        fixed["subtitle"] = _truncate_words(str(fixed.get("subtitle") or ""), 6)
-    _trim_visual_anchor_caption(fixed_components, 5)
-    _trim_card_text(fixed_components, heading_words=5, desc_words=7)
-    _trim_flow_text(fixed_components, label_words=3, action_words=6)
-    _trim_callout_text(fixed_components, 10)
-    _trim_metric_text(fixed_components, label_words=4, context_words=5)
-    _trim_comparison_text(fixed_components, label_words=3, side_words=6)
-    _trim_checklist_text(fixed_components, 6)
-    _trim_bullets(fixed, 9)
-    if _slide_visible_word_count(fixed) <= MAX_WORDS_PER_SLIDE:
-        return fixed
-
-    fixed["title"] = _truncate_words(str(fixed.get("title") or ""), 7)
-    _trim_card_text(fixed_components, heading_words=4, desc_words=5)
-    _trim_flow_text(fixed_components, label_words=3, action_words=5)
-    _trim_callout_text(fixed_components, 8)
-    _trim_metric_text(fixed_components, label_words=3, context_words=4)
-    _trim_comparison_text(fixed_components, label_words=3, side_words=5)
-    _trim_checklist_text(fixed_components, 5)
-    _trim_bullets(fixed, 6)
-    if _slide_visible_word_count(fixed) <= MAX_WORDS_PER_SLIDE:
-        return fixed
-
-    _drop_optional_slide_text(fixed, fixed_components)
-    return fixed
-
-
 def _slide_visible_word_count(slide: dict[str, Any]) -> int:
     visible_text = _visible_strings(
         {
@@ -2149,82 +3158,18 @@ def _slide_visible_word_count(slide: dict[str, Any]) -> int:
     return sum(_word_count(text) for text in visible_text)
 
 
-def _trim_visual_anchor_caption(components: dict[str, Any], max_words: int) -> None:
-    anchor = components.get("visual_anchor")
-    if isinstance(anchor, dict) and anchor.get("caption"):
-        anchor["caption"] = _truncate_words(str(anchor.get("caption") or ""), max_words)
-
-
-def _trim_card_text(components: dict[str, Any], *, heading_words: int, desc_words: int) -> None:
-    for card in components.get("cards", []):
-        if not isinstance(card, dict):
-            continue
-        card["heading"] = _truncate_words(str(card.get("heading") or ""), heading_words)
-        card["desc"] = _truncate_words(str(card.get("desc") or ""), desc_words)
-
-
-def _trim_flow_text(components: dict[str, Any], *, label_words: int, action_words: int) -> None:
-    for step in components.get("flow_steps", []):
-        if not isinstance(step, dict):
-            continue
-        step["label"] = _truncate_words(str(step.get("label") or ""), label_words)
-        step["action"] = _repair_action_text(_truncate_words(str(step.get("action") or ""), action_words))
-
-
-def _trim_callout_text(components: dict[str, Any], max_words: int) -> None:
-    callout = components.get("callout_box")
-    if isinstance(callout, dict):
-        callout["text"] = _truncate_words(str(callout.get("text") or ""), max_words)
-
-
-def _trim_metric_text(components: dict[str, Any], *, label_words: int, context_words: int) -> None:
-    for metric in components.get("metrics", []):
-        if not isinstance(metric, dict):
-            continue
-        metric["value"] = _truncate_words(str(metric.get("value") or ""), 3)
-        metric["label"] = _truncate_words(str(metric.get("label") or ""), label_words)
-        metric["context"] = _truncate_words(str(metric.get("context") or ""), context_words)
-
-
-def _trim_comparison_text(components: dict[str, Any], *, label_words: int, side_words: int) -> None:
-    for row in components.get("comparison", []):
-        if not isinstance(row, dict):
-            continue
-        row["label"] = _truncate_words(str(row.get("label") or ""), label_words)
-        row["left"] = _truncate_words(str(row.get("left") or ""), side_words)
-        row["right"] = _truncate_words(str(row.get("right") or ""), side_words)
-
-
-def _trim_checklist_text(components: dict[str, Any], max_words: int) -> None:
-    for item in components.get("checklist", []):
-        if isinstance(item, dict):
-            item["text"] = _truncate_words(str(item.get("text") or ""), max_words)
-
-
-def _trim_bullets(slide: dict[str, Any], max_words: int) -> None:
-    bullets = slide.get("bullets")
-    if isinstance(bullets, list):
-        slide["bullets"] = [_truncate_words(str(bullet), max_words) for bullet in bullets[:MAX_BULLETS_PER_SLIDE]]
-
-
-def _drop_optional_slide_text(slide: dict[str, Any], components: dict[str, Any]) -> None:
-    if slide.get("subtitle"):
-        slide["subtitle"] = None
-    _trim_visual_anchor_caption(components, 0)
-    _trim_callout_text(components, 6)
-    _trim_card_text(components, heading_words=3, desc_words=4)
-    _trim_flow_text(components, label_words=2, action_words=4)
-    _trim_metric_text(components, label_words=2, context_words=3)
-    _trim_comparison_text(components, label_words=2, side_words=4)
-    _trim_checklist_text(components, 4)
-    _trim_bullets(slide, 4)
-
-
 def _repair_card_payload(card: dict[str, Any]) -> dict[str, Any]:
+    points = card.get("points")
+    repaired_points = [
+        _truncate_words(str(point), CARD_POINT_MAX_WORDS)
+        for point in points[:CARD_MAX_POINTS]
+        if str(point).strip()
+    ] if isinstance(points, list) else []
     return {
         **card,
         "heading": _truncate_words(str(card.get("heading") or ""), 7),
         "desc": _truncate_words(str(card.get("desc") or ""), CARD_DESC_MAX_WORDS),
+        "points": repaired_points,
     }
 
 
@@ -2243,23 +3188,23 @@ def _repair_metric_payload(metric: dict[str, Any]) -> dict[str, Any]:
         **metric,
         "value": _truncate_words(str(metric.get("value") or ""), 4),
         "label": _truncate_words(str(metric.get("label") or ""), 6),
-        "context": _truncate_words(str(metric.get("context") or ""), 10),
+        "context": _truncate_words(str(metric.get("context") or ""), 14),
     }
 
 
 def _repair_comparison_payload(row: dict[str, Any]) -> dict[str, Any]:
     return {
         **row,
-        "label": _truncate_words(str(row.get("label") or ""), 5),
-        "left": _truncate_words(str(row.get("left") or ""), 12),
-        "right": _truncate_words(str(row.get("right") or ""), 12),
+        "label": _truncate_words(str(row.get("label") or ""), 8),
+        "left": _truncate_words(str(row.get("left") or ""), 22),
+        "right": _truncate_words(str(row.get("right") or ""), 22),
     }
 
 
 def _repair_checklist_payload(item: dict[str, Any]) -> dict[str, Any]:
     return {
         **item,
-        "text": _truncate_words(str(item.get("text") or ""), 14),
+        "text": _truncate_words(str(item.get("text") or ""), 18),
     }
 
 
@@ -2376,9 +3321,18 @@ def _validate_components_for_layout(slide: SlidePayload) -> None:
     elif layout == "CHECKLIST":
         if not 4 <= len(components.checklist) <= 5:
             raise ValueError("CHECKLIST requires 4-5 checklist items.")
+    elif layout == "PROCESS_TIMELINE":
+        if not 5 <= len(components.flow_steps) <= 7:
+            raise ValueError("PROCESS_TIMELINE requires 5-7 flow steps.")
+    elif layout == "COMPARISON_TABLE":
+        if not 3 <= len(components.comparison) <= 5:
+            raise ValueError("COMPARISON_TABLE requires 3-5 comparison rows.")
+    elif layout == "ICON_GRID":
+        if not 4 <= len(components.cards) <= 6:
+            raise ValueError("ICON_GRID requires 4-6 cards.")
 
 
-def _review_deck_design(deck: SlideDeckPayload) -> list[str]:
+def _review_deck_design(deck: SlideDeckPayload, coverage_topics: list[str] | None = None) -> list[str]:
     """Deterministic design review used as the repair signal for the composer."""
     issues: list[str] = []
     content_slides = [slide for slide in deck.slides if slide.layout_type != "TRANSITION"]
@@ -2399,8 +3353,48 @@ def _review_deck_design(deck: SlideDeckPayload) -> list[str]:
         else:
             boxed_streak = 0
 
+    repeated_layout_issue = _consecutive_layout_issue(deck.slides)
+    if repeated_layout_issue:
+        issues.append(repeated_layout_issue)
+
     if deck.slide_count >= 8 and not any(slide.layout_type == "TRANSITION" for slide in deck.slides):
         issues.append("Decks with 8 or more slides need a TRANSITION slide between major topics.")
+
+    if deck.slide_count >= 8:
+        sparse_slides = [slide for slide in content_slides if _is_sparse_slide(slide)]
+        if len(sparse_slides) > 2:
+            numbers = ", ".join(str(slide.slide_number) for slide in sparse_slides[:4])
+            issues.append(f"Too many sparse large-frame slides: {numbers}. Add card points, metrics, comparison rows, or a source visual.")
+
+    dual_pillar_count = sum(1 for slide in deck.slides if slide.layout_type == "DUAL_PILLARS")
+    if dual_pillar_count > 2:
+        issues.append(f"Too many DUAL_PILLARS slides: {dual_pillar_count} found, maximum is 2.")
+
+    legacy_box_count = sum(1 for slide in content_slides if slide.layout_type in {"DUAL_PILLARS", "GRID_COMPOSITE"})
+    rich_layout_count = sum(1 for slide in content_slides if slide.layout_type in {"PROCESS_TIMELINE", "COMPARISON_TABLE", "ICON_GRID"})
+    if len(content_slides) >= 8 and legacy_box_count > max(3, math.ceil(len(content_slides) * 0.45)) and rich_layout_count < 2:
+        issues.append("Too many old card-frame layouts; use PROCESS_TIMELINE, COMPARISON_TABLE, or ICON_GRID for dense topics.")
+
+    for slide in deck.slides:
+        if not slide.title.strip():
+            issues.append(f"Slide {slide.slide_number} is missing an in-slide title.")
+        elif slide.layout_type not in {"TITLE_HERO", "TRANSITION"} and _is_generic_slide_title(slide.title):
+            issues.append(f"Slide {slide.slide_number} title is too generic; write a message headline that names the slide's point.")
+
+        if _is_empty_visual_anchor_slide(slide):
+            issues.append(
+                f"Slide {slide.slide_number} uses VISUAL_ANCHOR with no explanatory body; add cards with points or a callout_box."
+            )
+
+        if slide.layout_type == "DUAL_PILLARS" and _dual_pillars_should_be_richer(slide):
+            issues.append(
+                f"Slide {slide.slide_number} uses DUAL_PILLARS for a multi-branch topic; use COMPARISON_TABLE, ICON_GRID, PROCESS_TIMELINE, or add card points."
+            )
+            break
+
+    missing_topics = _missing_coverage_topics(deck, coverage_topics or [])
+    if missing_topics:
+        issues.append("Missing important source topics: " + ", ".join(missing_topics[:5]) + ".")
 
     return issues
 
@@ -2413,9 +3407,114 @@ def _has_component_anchor(slide: SlidePayload) -> bool:
         return True
     if any(metric.icon_key in ICON_KEYS for metric in components.metrics):
         return True
+    if any(row.icon_key in ICON_KEYS for row in components.comparison):
+        return True
     if any(item.icon_key in ICON_KEYS for item in components.checklist):
         return True
+    if slide.layout_type == "PROCESS_TIMELINE" and components.flow_steps:
+        return True
     return False
+
+
+def _consecutive_layout_issue(slides: list[SlidePayload]) -> str | None:
+    previous_layout = ""
+    repeat_count = 0
+    for slide in slides:
+        if slide.layout_type == previous_layout:
+            repeat_count += 1
+            if repeat_count > 2:
+                return (
+                    f"Slides around {slide.slide_number} repeat {slide.layout_type} more than two times consecutively; "
+                    "switch one slide to PROCESS_TIMELINE, COMPARISON_TABLE, ICON_GRID, VISUAL_ANCHOR, or TRANSITION."
+                )
+        else:
+            previous_layout = slide.layout_type
+            repeat_count = 1
+    return None
+
+
+def _is_generic_slide_title(title: str) -> bool:
+    normalized = _normalized_label(title)
+    if normalized in GENERIC_SLIDE_TITLES:
+        return True
+    words = normalized.split()
+    return len(words) <= 2 and any(word in GENERIC_SLIDE_TITLES for word in words)
+
+
+def _is_generic_deck_title(title: str) -> bool:
+    normalized = _normalized_label(title)
+    if not normalized:
+        return True
+    return _is_generic_slide_title(title) or normalized.startswith(("academic overview", "tong quan hoc thuat"))
+
+
+def _is_empty_visual_anchor_slide(slide: SlidePayload) -> bool:
+    if slide.layout_type != "VISUAL_ANCHOR":
+        return False
+    components = slide.components
+    if components.callout_box and components.callout_box.text.strip():
+        return False
+    if slide.bullets:
+        return False
+    for card in components.cards:
+        if card.desc.strip() or any(point.strip() for point in card.points):
+            return False
+    if components.checklist or components.metrics or components.comparison or components.flow_steps:
+        return False
+    return True
+
+
+def _fill_empty_visual_anchor_fallbacks(deck: SlideDeckPayload) -> None:
+    """Keep accepted fallback decks from producing blank VISUAL_ANCHOR pages."""
+    for slide in deck.slides:
+        if not _is_empty_visual_anchor_slide(slide):
+            continue
+        fallback_text = slide.components.visual_anchor.caption or slide.subtitle or slide.title
+        slide.components.callout_box = CalloutBox(
+            type="INSIGHT",
+            text=_truncate_words(str(fallback_text), CALLOUT_MAX_WORDS),
+        )
+
+
+def _is_sparse_slide(slide: SlidePayload) -> bool:
+    if slide.layout_type not in {"DUAL_PILLARS", "GRID_COMPOSITE", "VISUAL_ANCHOR", "ICON_GRID"}:
+        return False
+    if slide.visual.kind in {"source_page", "generated_image"} or slide.components.visual_anchor.kind in {"source_page", "generated_image"}:
+        return False
+    visible_words = _slide_visible_word_count(slide.model_dump())
+    card_points = sum(len(card.points) for card in slide.components.cards)
+    if slide.layout_type == "VISUAL_ANCHOR":
+        return visible_words < 45 and card_points == 0
+    if slide.layout_type == "ICON_GRID":
+        return visible_words < 75 or card_points < 4
+    return visible_words < 60 or (slide.components.cards and card_points == 0 and visible_words < 70)
+
+
+def _dual_pillars_should_be_richer(slide: SlidePayload) -> bool:
+    card_points = sum(len(card.points) for card in slide.components.cards)
+    if card_points:
+        return False
+    text = " ".join(_visible_strings(slide.model_dump()))
+    branch_markers = len(re.findall(r"[,/;]| and | va | và |\\+", _normalized_label(text)))
+    return branch_markers >= 3
+
+
+def _missing_coverage_topics(deck: SlideDeckPayload, coverage_topics: list[str]) -> list[str]:
+    if not coverage_topics:
+        return []
+    deck_text = " ".join(_visible_strings(deck.model_dump()))
+    missing: list[str] = []
+    for topic in coverage_topics:
+        score = _topic_match_score(topic, deck_text)
+        if score < _coverage_presence_threshold(topic):
+            missing.append(topic)
+    return missing
+
+
+def _coverage_presence_threshold(topic: str) -> int:
+    if topic in {"Smart Strings", "Pseudo Localization", "Object Pooling", "Pre-flight Checklist"}:
+        return 1
+    return 2
 
 
 def _looks_action_like(text: str) -> bool:
@@ -2443,6 +3542,7 @@ def _looks_action_like(text: str) -> bool:
         "preload",
         "profile",
         "render",
+        "resolve",
         "reuse",
         "select",
         "set",

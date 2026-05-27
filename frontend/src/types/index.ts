@@ -13,6 +13,9 @@ export type SlideLayoutType =
   | 'METRIC_DASHBOARD'
   | 'CODE_COMPARISON'
   | 'CHECKLIST'
+  | 'PROCESS_TIMELINE'
+  | 'COMPARISON_TABLE'
+  | 'ICON_GRID'
   | 'TRANSITION'
   | 'TITLE'
   | 'KEY_BULLETS'
@@ -49,6 +52,20 @@ export type SlideIconKey =
   | 'repeat'
   | 'timer'
   | 'network'
+  | 'activity'
+  | 'braces'
+  | 'bug'
+  | 'boxes'
+  | 'file-json'
+  | 'git-branch'
+  | 'hard-drive'
+  | 'image'
+  | 'languages'
+  | 'lightbulb'
+  | 'memory-stick'
+  | 'mouse-pointer-click'
+  | 'table'
+  | 'wrench'
 
 export type SlideCardTag = 'LEGACY' | 'MID_LEVEL' | 'RECOMMENDED' | 'WARNING' | 'INSIGHT' | 'DEFAULT'
 export type SlideCalloutType = 'WARNING' | 'INSIGHT' | 'RECOMMENDED'
@@ -119,6 +136,14 @@ export interface SlideVisual {
   page?: number | null
   alt?: string | null
   data_url?: string | null
+  crop_box?: SlideCropBox | null
+}
+
+export interface SlideCropBox {
+  x: number
+  y: number
+  width: number
+  height: number
 }
 
 export interface SlideCardComponent {
@@ -127,6 +152,7 @@ export interface SlideCardComponent {
   icon_key?: SlideIconKey
   heading?: string
   desc?: string
+  points?: string[]
 }
 
 export interface SlideFlowStepComponent {
@@ -148,6 +174,7 @@ export interface SlideMetricComponent {
 }
 
 export interface SlideComparisonComponent {
+  icon_key?: SlideIconKey
   label?: string
   left?: string
   right?: string
@@ -167,6 +194,7 @@ export interface SlideVisualAnchorComponent {
   page?: number | null
   alt?: string | null
   data_url?: string | null
+  crop_box?: SlideCropBox | null
 }
 
 export interface SlideComponents {
@@ -198,6 +226,7 @@ export interface SlideDeckJson {
   story_outline?: unknown
   source_count?: number
   image_generation_count?: number
+  source_crop_count?: number
 }
 
 export interface SlideDeckDocument extends BaseStudioDocument {

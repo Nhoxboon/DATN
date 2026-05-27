@@ -7,9 +7,14 @@ declare global {
   interface Window {
     __SLIDE_DECK__?: SlideDeckJson
     __SLIDE_RENDER_READY__?: boolean
+    __SLIDE_RENDERER_VERSION__?: string
     renderSlideDeck?: (deck: SlideDeckJson) => Promise<boolean>
   }
 }
+
+const SLIDE_RENDERER_VERSION = 'v5-title-layout'
+
+window.__SLIDE_RENDERER_VERSION__ = SLIDE_RENDERER_VERSION
 
 const rootElement = document.getElementById('root')
 let root: Root | null = null
