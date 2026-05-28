@@ -120,6 +120,7 @@ class NotebookWorkspaceService:
         self._require_notebook(user_id, notebook_id)
         source_storage_paths = self._storage_paths_for_notebook(user_id, notebook_id)
         audio_storage_paths = self._audio_storage_paths_for_notebook(user_id, notebook_id)
+        slide_storage_paths = self._slide_storage_paths_for_notebook(user_id, notebook_id)
         self._revoke_notebook_tasks(user_id, notebook_id)
         (
             self.client.table("notebooks")
@@ -130,6 +131,7 @@ class NotebookWorkspaceService:
         )
         self._delete_storage_paths(source_storage_paths)
         self._delete_audio_storage_paths(audio_storage_paths)
+        self._delete_slide_storage_paths(slide_storage_paths)
 
     def list_documents(self, user_id: str, notebook_id: str) -> list[DocumentStatus]:
         self._require_notebook(user_id, notebook_id)
@@ -784,6 +786,36 @@ class NotebookWorkspaceService:
 
         self._remove_storage_paths(get_settings().audio_overview_bucket, storage_paths, "audio overviews")
 
+    def _slide_storage_paths_for_notebook(self, user_id: str, notebook_id: str) -> list[str]:
+        result = (
+            self.client.table("slides")
+            .select("id,status,storage_path,metadata")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        paths: list[str] = []
+        for row in (result.data if isinstance(result.data, list) else []):
+            if not isinstance(row, dict):
+                continue
+
+            storage_path = row.get("storage_path")
+            if isinstance(storage_path, str) and storage_path:
+                paths.append(storage_path)
+                continue
+
+            deck_id = row.get("id")
+            if row.get("status") == "completed" and deck_id:
+                paths.append(f"{user_id}/{notebook_id}/{deck_id}.pdf")
+
+        return list(dict.fromkeys(paths))
+
+    def _delete_slide_storage_paths(self, storage_paths: list[str]) -> None:
+        if not storage_paths:
+            return
+
+        self._remove_storage_paths(get_settings().slide_deck_bucket, storage_paths, "slide decks")
+
     def _remove_storage_paths(self, bucket_name: str, storage_paths: list[str], label: str) -> None:
         storage = getattr(self.client, "storage", None)
         if not storage or not storage_paths:
@@ -821,6 +853,19 @@ class NotebookWorkspaceService:
             task_id = metadata.get("task_id") if isinstance(metadata, dict) else None
             if isinstance(task_id, str) and task_id:
                 self._revoke_task(task_id, "audio overview")
+
+        slide_decks = (
+            self.client.table("slides")
+            .select("metadata")
+            .eq("notebook_id", notebook_id)
+            .eq("user_id", user_id)
+            .execute()
+        )
+        for deck in (slide_decks.data if isinstance(slide_decks.data, list) else []):
+            metadata = deck.get("metadata") if isinstance(deck, dict) else None
+            task_id = metadata.get("task_id") if isinstance(metadata, dict) else None
+            if isinstance(task_id, str) and task_id:
+                self._revoke_task(task_id, "slide deck")
 
     def _revoke_processing_task(self, source: dict[str, Any]) -> None:
         task_id = str(source.get("task_id") or "").strip()

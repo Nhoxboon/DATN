@@ -64,7 +64,7 @@ services:
       - --pool=solo
       - --concurrency=1
       - -Q
-      - document_processing,embedding,storage,audio_overviews
+      - document_processing,embedding,storage,audio_overviews,slides
     env_file:
       - .env
     environment:
@@ -81,6 +81,7 @@ services:
       - ./app:/app/app
       - ./config.yaml:/app/config.yaml:ro
       - ./models:/app/models:ro
+      - ../frontend/dist:/app/slide-renderer:ro
       - datn-uploads:/app/uploads
     deploy:
       resources:

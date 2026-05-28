@@ -264,7 +264,13 @@ class AudioOverviewTaskHelperTests(unittest.TestCase):
     def test_normalize_script_speaker_labels_removes_persona_names(self) -> None:
         script = "Minh: Mở đầu.\nLan: Đúng vậy, Minh. Nội dung chính."
 
-        normalized = _normalize_script_speaker_labels(script, "podcast_dialogue", ["Minh", "Lan"])
+        normalized = _normalize_script_speaker_labels(
+            script,
+            "podcast_dialogue",
+            ["Minh", "Lan"],
+            ["Speaker A", "Speaker B"],
+            ["Narrator"],
+        )
 
         self.assertIn("Speaker A: Mở đầu.", normalized)
         self.assertIn("Speaker B: Đúng vậy. Nội dung chính.", normalized)

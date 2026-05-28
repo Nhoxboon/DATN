@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.2.8",
+    "@fontsource/manrope": "^5.2.8",
     "@supabase/supabase-js": "^2.105.3",
     "@tailwindcss/vite": "^4.2.2",
     "lucide-react": "^1.8.0",

@@ -151,6 +151,7 @@ class FakeSupabaseClient:
             "chat_messages": [],
             "notebook_notes": [],
             "audio_overviews": [],
+            "slides": [],
         }
         self.storage = FakeStorage()
 
@@ -180,6 +181,7 @@ class FakeSupabaseClient:
                 "chat_sessions",
                 "notebook_notes",
                 "audio_overviews",
+                "slides",
             ):
                 self.tables[related_table] = [
                     row for row in self.tables[related_table] if row.get("notebook_id") not in ids

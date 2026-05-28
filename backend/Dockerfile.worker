@@ -12,6 +12,7 @@ RUN apt-get update && apt-get install -y \
     libreoffice-writer \
     ffmpeg \
     poppler-utils \
+    fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -r appuser && useradd -r -g appuser -m -d /home/appuser appuser
@@ -19,9 +20,11 @@ RUN groupadd -r appuser && useradd -r -g appuser -m -d /home/appuser appuser
 RUN pip install --no-cache-dir uv
 ENV UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cu121
 ENV PYTHONUNBUFFERED=1
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
+RUN uv run playwright install --with-deps chromium && chmod -R 755 /ms-playwright
 
 COPY app ./app
 COPY config.yaml ./
@@ -34,4 +37,4 @@ USER appuser
 CMD ["uv", "run", "celery", "-A", "app.workers.celery_app", "worker", \
      "--loglevel=info", \
      "--concurrency=2", \
-     "-Q", "document_processing,embedding,storage,audio_overviews"]
+     "-Q", "document_processing,embedding,storage,audio_overviews,slides"]
