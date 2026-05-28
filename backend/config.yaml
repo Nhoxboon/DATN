@@ -32,6 +32,25 @@ slide_deck:
   browser_max_retries: 2
   browser_screenshot_scale: 2
 
+# Audio Overview Generation
+audio_overview:
+  tts_model: "gemini-2.5-flash-preview-tts"
+  min_duration_seconds: 150
+  min_script_words: 460
+  max_context_chars: 42000
+  batch_context_chars: 6000
+  max_render_attempts: 3
+  audio_rate: 24000
+  script_temperature: 0.45
+  script_max_output_tokens: 7000
+  podcast_speakers: ["Speaker A", "Speaker B"]
+  briefing_speakers: ["Narrator"]
+  podcast_voices: ["Kore", "Puck"]
+  briefing_voice: "Charon"
+  encode_bitrate: "96k"
+  encode_timeout_seconds: 300
+  probe_timeout_seconds: 60
+
 # Chunking Configuration
 chunking:
   strategy: "semantic"  # semantic, fixed, recursive

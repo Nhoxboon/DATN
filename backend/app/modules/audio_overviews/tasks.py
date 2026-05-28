@@ -25,14 +25,6 @@ from app.workers.celery_app import celery_app
 
 logger = logging.getLogger(__name__)
 
-MIN_SCRIPT_WORDS = 460
-MAX_CONTEXT_CHARS = 42000
-BATCH_CONTEXT_CHARS = 6000
-MAX_RENDER_ATTEMPTS = 3
-AUDIO_RATE = 24000
-PODCAST_SPEAKERS = ["Speaker A", "Speaker B"]
-BRIEFING_SPEAKERS = ["Narrator"]
-
 
 @celery_app.task(bind=True, max_retries=2, default_retry_delay=60)
 def generate_audio_overview_task(
@@ -52,6 +44,7 @@ def generate_audio_overview_task(
         return _cancelled_result(overview_id, "missing")
 
     app_config = get_app_config()
+    audio_config = app_config.audio_overview
     genai_client = genai.Client(api_key=settings.google_api_key)
 
     try:
@@ -69,12 +62,19 @@ def generate_audio_overview_task(
             raise ValueError("No indexed chunks were found for the selected documents.")
 
         context = _build_context(chunks)
-        if len(context) > MAX_CONTEXT_CHARS:
-            context = _summarize_context(genai_client, app_config.llm.gemini.model, context, document_names)
+        if len(context) > audio_config.max_context_chars:
+            context = _summarize_context(
+                genai_client,
+                app_config.llm.gemini.model,
+                context,
+                document_names,
+                audio_config.batch_context_chars,
+            )
 
         script_payload = _generate_script(
             genai_client=genai_client,
             model=app_config.llm.gemini.model,
+            audio_config=audio_config,
             context=context,
             document_names=document_names,
             previous_script=None,
@@ -84,30 +84,38 @@ def generate_audio_overview_task(
             workspace = Path(temp_dir)
             duration_seconds = 0.0
             m4a_path = workspace / "overview.m4a"
+            max_render_attempts = max(1, int(audio_config.max_render_attempts))
 
-            for attempt in range(MAX_RENDER_ATTEMPTS):
+            for attempt in range(max_render_attempts):
                 wav_path = workspace / f"overview-{attempt}.wav"
                 m4a_path = workspace / f"overview-{attempt}.m4a"
                 _render_tts_to_wav(
                     genai_client=genai_client,
-                    tts_model=settings.audio_overview_tts_model,
+                    tts_model=audio_config.tts_model,
+                    audio_config=audio_config,
                     script_payload=script_payload,
                     wav_path=wav_path,
                 )
-                _encode_m4a(wav_path, m4a_path)
-                duration_seconds = _probe_duration(m4a_path)
-                if duration_seconds >= settings.audio_overview_min_duration_seconds:
+                _encode_m4a(
+                    wav_path,
+                    m4a_path,
+                    audio_config.encode_bitrate,
+                    audio_config.encode_timeout_seconds,
+                )
+                duration_seconds = _probe_duration(m4a_path, audio_config.probe_timeout_seconds)
+                if duration_seconds >= audio_config.min_duration_seconds:
                     break
-                if attempt < MAX_RENDER_ATTEMPTS - 1:
+                if attempt < max_render_attempts - 1:
                     script_payload = _generate_script(
                         genai_client=genai_client,
                         model=app_config.llm.gemini.model,
+                        audio_config=audio_config,
                         context=context,
                         document_names=document_names,
                         previous_script=script_payload.get("script_text"),
                     )
 
-            _require_min_duration(duration_seconds, settings.audio_overview_min_duration_seconds)
+            _require_min_duration(duration_seconds, audio_config.min_duration_seconds)
 
             storage_path = f"{user_id}/{notebook_id}/{overview_id}.m4a"
             if not repository.get(overview_id):
@@ -128,7 +136,7 @@ def generate_audio_overview_task(
             "content_type": "audio/mp4",
             "error_message": None,
             "script_model": app_config.llm.gemini.model,
-            "tts_model": settings.audio_overview_tts_model,
+            "tts_model": audio_config.tts_model,
         }
         try:
             repository.update_status(overview_id, "completed", metadata, storage_path=storage_path)
@@ -211,10 +219,16 @@ def _remove_uploaded_audio(client: Any, bucket: str, storage_path: str | None) -
         logger.info("Could not remove cancelled audio object path=%s.", storage_path, exc_info=True)
 
 
-def _summarize_context(genai_client: genai.Client, model: str, context: str, document_names: list[str]) -> str:
+def _summarize_context(
+    genai_client: genai.Client,
+    model: str,
+    context: str,
+    document_names: list[str],
+    batch_context_chars: int,
+) -> str:
     """Summarize long notebook context in batches before final script generation."""
     summaries: list[str] = []
-    for batch in _split_text(context, BATCH_CONTEXT_CHARS):
+    for batch in _split_text(context, max(1, int(batch_context_chars))):
         prompt = (
             "Summarize this document context for a grounded audio overview. "
             "Keep important claims, definitions, numbers, caveats, and relationships. "
@@ -231,6 +245,7 @@ def _generate_script(
     *,
     genai_client: genai.Client,
     model: str,
+    audio_config: Any,
     context: str,
     document_names: list[str],
     previous_script: str | None,
@@ -239,7 +254,7 @@ def _generate_script(
     retry_instruction = ""
     if previous_script:
         retry_instruction = (
-            "\nThe previous transcript was too short for a 2 minute 30 second audio. "
+            f"\nThe previous transcript was too short for a {_duration_label(audio_config.min_duration_seconds)} audio. "
             "Expand it substantially while preserving factual grounding. "
             "Previous transcript:\n"
             f"{previous_script}\n"
@@ -254,12 +269,12 @@ Use only the supplied context. Choose the best style:
 
 Requirements:
 - Auto-detect the main language from the context and write in that language.
-- The spoken transcript must be at least {MIN_SCRIPT_WORDS} words so the rendered audio can reach at least 2 minutes 30 seconds at a natural pace.
+- The spoken transcript must be at least {audio_config.min_script_words} words so the rendered audio can reach at least {_duration_label(audio_config.min_duration_seconds)} at a natural pace.
 - If the documents are sparse, fill time with careful framing, definitions, implications, recap, and transitions, but do not invent unsupported facts.
 - Do not invent human speaker names, host names, or personas.
 - Do not address, greet, or refer to a co-host by name or label inside the spoken text. Avoid phrases like "Đúng vậy, Minh", "Bạn nói đúng, Speaker A", or "as you said".
-- For podcast_dialogue, use exactly these neutral line labels only: "Speaker A: text" and "Speaker B: text".
-- For news_briefing, use exactly this neutral line label only: "Narrator: text".
+- For podcast_dialogue, use exactly these neutral line labels only: {_speaker_label_examples(audio_config.podcast_speakers)}.
+- For news_briefing, use exactly this neutral line label only: {_speaker_label_examples(audio_config.briefing_speakers)}.
 - Speaker labels are only performance directions for TTS; the words after the colon must not mention the label or speaker identity.
 - Return only valid JSON with keys: style, title, speakers, script_text.
 
@@ -273,8 +288,8 @@ Context:
         model=model,
         contents=prompt,
         config=types.GenerateContentConfig(
-            temperature=0.45,
-            max_output_tokens=7000,
+            temperature=audio_config.script_temperature,
+            max_output_tokens=audio_config.script_max_output_tokens,
             response_mime_type="application/json",
         ),
     )
@@ -285,8 +300,16 @@ Context:
 
     style = str(payload.get("style") or "podcast_dialogue")
     source_speakers = payload.get("speakers")
-    speakers = PODCAST_SPEAKERS if style == "podcast_dialogue" else BRIEFING_SPEAKERS
-    script_text = _normalize_script_speaker_labels(script_text, style, source_speakers)
+    podcast_speakers = _configured_labels(audio_config.podcast_speakers)
+    briefing_speakers = _configured_labels(audio_config.briefing_speakers)
+    speakers = podcast_speakers if style == "podcast_dialogue" else briefing_speakers
+    script_text = _normalize_script_speaker_labels(
+        script_text,
+        style,
+        source_speakers,
+        podcast_speakers,
+        briefing_speakers,
+    )
 
     return {
         "style": style,
@@ -296,12 +319,45 @@ Context:
     }
 
 
-def _normalize_script_speaker_labels(script_text: str, style: str, source_speakers: Any) -> str:
+def _speaker_label_examples(labels: list[str]) -> str:
+    return " and ".join(f'"{label}: text"' for label in labels)
+
+
+def _duration_label(seconds: int) -> str:
+    if seconds <= 0:
+        return "full-length"
+
+    minutes, remaining_seconds = divmod(seconds, 60)
+    parts: list[str] = []
+    if minutes:
+        minute_unit = "minute" if minutes == 1 else "minutes"
+        parts.append(f"{minutes} {minute_unit}")
+    if remaining_seconds:
+        second_unit = "second" if remaining_seconds == 1 else "seconds"
+        parts.append(f"{remaining_seconds} {second_unit}")
+    return " ".join(parts)
+
+
+def _configured_labels(labels: Any) -> list[str]:
+    configured = [str(label).strip() for label in labels] if isinstance(labels, list) else []
+    configured = [label for label in configured if label]
+    if not configured:
+        raise ValueError("Audio overview labels must contain at least one value.")
+    return configured
+
+
+def _normalize_script_speaker_labels(
+    script_text: str,
+    style: str,
+    source_speakers: Any,
+    podcast_speakers: list[str],
+    briefing_speakers: list[str],
+) -> str:
     """Use stable non-persona speaker labels for TTS and script display."""
     if style != "podcast_dialogue":
-        return _replace_line_labels(script_text, BRIEFING_SPEAKERS)
+        return _replace_line_labels(script_text, briefing_speakers)
 
-    labels = PODCAST_SPEAKERS
+    labels = podcast_speakers
     source_labels = [str(speaker).strip() for speaker in source_speakers] if isinstance(source_speakers, list) else []
     source_labels = [speaker for speaker in source_labels if speaker]
     label_map = {
@@ -368,6 +424,7 @@ def _render_tts_to_wav(
     *,
     genai_client: genai.Client,
     tts_model: str,
+    audio_config: Any,
     script_payload: dict[str, Any],
     wav_path: Path,
 ) -> None:
@@ -381,19 +438,22 @@ def _render_tts_to_wav(
     )
 
     if script_payload.get("style") == "podcast_dialogue" and len(speakers) >= 2:
+        podcast_voices = _configured_labels(audio_config.podcast_voices)
+        if len(podcast_voices) < 2:
+            raise ValueError("Audio overview podcast voices must contain at least two values.")
         speech_config = types.SpeechConfig(
             multi_speaker_voice_config=types.MultiSpeakerVoiceConfig(
                 speaker_voice_configs=[
                     types.SpeakerVoiceConfig(
                         speaker=speakers[0],
                         voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Kore")
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=podcast_voices[0])
                         ),
                     ),
                     types.SpeakerVoiceConfig(
                         speaker=speakers[1],
                         voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Puck")
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=podcast_voices[1])
                         ),
                     ),
                 ]
@@ -402,7 +462,7 @@ def _render_tts_to_wav(
     else:
         speech_config = types.SpeechConfig(
             voice_config=types.VoiceConfig(
-                prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name="Charon")
+                prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=audio_config.briefing_voice)
             )
         )
 
@@ -416,7 +476,7 @@ def _render_tts_to_wav(
     )
     inline_data = response.candidates[0].content.parts[0].inline_data
     audio_bytes = _coerce_audio_bytes(inline_data.data)
-    _write_wave(wav_path, audio_bytes)
+    _write_wave(wav_path, audio_bytes, rate=audio_config.audio_rate)
 
 
 def _coerce_audio_bytes(data: bytes | str) -> bytes:
@@ -425,7 +485,7 @@ def _coerce_audio_bytes(data: bytes | str) -> bytes:
     return base64.b64decode(data)
 
 
-def _write_wave(path: Path, pcm: bytes, channels: int = 1, rate: int = AUDIO_RATE, sample_width: int = 2) -> None:
+def _write_wave(path: Path, pcm: bytes, rate: int, channels: int = 1, sample_width: int = 2) -> None:
     with wave.open(str(path), "wb") as wav:
         wav.setnchannels(channels)
         wav.setsampwidth(sample_width)
@@ -433,15 +493,15 @@ def _write_wave(path: Path, pcm: bytes, channels: int = 1, rate: int = AUDIO_RAT
         wav.writeframes(pcm)
 
 
-def _encode_m4a(wav_path: Path, m4a_path: Path) -> None:
+def _encode_m4a(wav_path: Path, m4a_path: Path, bitrate: str, timeout_seconds: int) -> None:
     if not shutil.which("ffmpeg"):
         raise RuntimeError("ffmpeg is required to encode Audio Overview files as M4A.")
 
     result = subprocess.run(
-        ["ffmpeg", "-y", "-i", str(wav_path), "-c:a", "aac", "-b:a", "96k", str(m4a_path)],
+        ["ffmpeg", "-y", "-i", str(wav_path), "-c:a", "aac", "-b:a", bitrate, str(m4a_path)],
         capture_output=True,
         text=True,
-        timeout=300,
+        timeout=timeout_seconds,
         check=False,
     )
     if result.returncode != 0:
@@ -449,7 +509,7 @@ def _encode_m4a(wav_path: Path, m4a_path: Path) -> None:
         raise RuntimeError(f"ffmpeg failed to encode M4A: {details}")
 
 
-def _probe_duration(audio_path: Path) -> float:
+def _probe_duration(audio_path: Path, timeout_seconds: int) -> float:
     if not shutil.which("ffprobe"):
         return 0.0
 
@@ -466,7 +526,7 @@ def _probe_duration(audio_path: Path) -> float:
         ],
         capture_output=True,
         text=True,
-        timeout=60,
+        timeout=timeout_seconds,
         check=False,
     )
     if result.returncode != 0:
