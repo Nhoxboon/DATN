@@ -19,24 +19,23 @@ os.environ.setdefault("SUPABASE_SERVICE_KEY", "service-key")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 os.environ.setdefault("GOOGLE_API_KEY", "google-key")
 
-from app.modules.slides.service import SlideDeckService, SlideDeckValidationError
-from app.modules.slides.tasks import (
-    SlideDeckPayload,
-    StoryOutlinePayload,
-    _deck_prompt,
-    _choose_source_crop_box,
-    _expected_coverage_topics,
-    _fallback_story_outline,
-    _icon_grid_boxes,
-    _materialize_visuals,
+from app.modules.slides.coverage_utils import _expected_coverage_topics
+from app.modules.slides.models import SlideDeckPayload, StoryOutlinePayload
+from app.modules.slides.payload_utils import (
     _parse_json_object,
     _repair_deck_payload,
     _review_deck_design,
     _slide_visible_word_count,
-    _render_deck_pdf_for_config,
-    _truncate_words,
+)
+from app.modules.slides.pillow_pdf_renderer import _icon_grid_boxes, _render_deck_pdf_for_config
+from app.modules.slides.service import SlideDeckService, SlideDeckValidationError
+from app.modules.slides.slide_generator import _deck_prompt, _fallback_story_outline
+from app.modules.slides.tasks import generate_slide_deck_task
+from app.modules.slides.text_utils import _truncate_words
+from app.modules.slides.visual_processor import (
+    _choose_source_crop_box,
+    _materialize_visuals,
     _visual_candidates,
-    generate_slide_deck_task,
 )
 
 
@@ -890,7 +889,7 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
             ],
         }
 
-        with patch("app.modules.slides.tasks._generate_image_data_url") as generate_image:
+        with patch("app.modules.slides.visual_processor._generate_image_data_url") as generate_image:
             result = _materialize_visuals(
                 deck=deck,
                 genai_client=Mock(),
@@ -917,7 +916,7 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
         deck = {"slides": [{"slide_number": 1, "title": "One"}]}
 
         with tempfile.TemporaryDirectory() as temp_dir, patch(
-            "app.modules.slides.tasks.render_deck_pdf_with_browser"
+            "app.modules.slides.pillow_pdf_renderer.render_deck_pdf_with_browser"
         ) as browser_renderer:
             pdf_path = Path(temp_dir) / "deck.pdf"
             result = _render_deck_pdf_for_config(deck, pdf_path, config)
@@ -937,9 +936,9 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
         deck = {"slides": [{"slide_number": 1, "title": "One"}]}
 
         with tempfile.TemporaryDirectory() as temp_dir, patch(
-            "app.modules.slides.tasks.render_deck_pdf_with_browser",
+            "app.modules.slides.pillow_pdf_renderer.render_deck_pdf_with_browser",
             side_effect=RuntimeError("chromium unavailable"),
-        ) as browser_renderer, patch("app.modules.slides.tasks._render_deck_pdf") as pillow_renderer:
+        ) as browser_renderer, patch("app.modules.slides.pillow_pdf_renderer._render_deck_pdf") as pillow_renderer:
             pdf_path = Path(temp_dir) / "deck.pdf"
             result = _render_deck_pdf_for_config(deck, pdf_path, config)
 
@@ -958,7 +957,7 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
         deck = {"slides": [{"slide_number": 1, "title": "One"}]}
 
         with tempfile.TemporaryDirectory() as temp_dir, patch(
-            "app.modules.slides.tasks.render_deck_pdf_with_browser",
+            "app.modules.slides.pillow_pdf_renderer.render_deck_pdf_with_browser",
             side_effect=RuntimeError("chromium unavailable"),
         ), self.assertRaises(RuntimeError):
             _render_deck_pdf_for_config(deck, Path(temp_dir) / "deck.pdf", config)
@@ -988,7 +987,7 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
             ],
         }
 
-        with patch("app.modules.slides.tasks._generate_image_data_url", return_value="data:image/jpeg;base64,abc"):
+        with patch("app.modules.slides.visual_processor._generate_image_data_url", return_value="data:image/jpeg;base64,abc"):
             result = _materialize_visuals(
                 deck=deck,
                 genai_client=Mock(),
@@ -1031,7 +1030,7 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
         }
 
         with patch(
-            "app.modules.slides.tasks._source_visual_data_and_crop",
+            "app.modules.slides.visual_processor._source_visual_data_and_crop",
             return_value=("data:image/jpeg;base64,abc", {"x": 0.1, "y": 0.2, "width": 0.5, "height": 0.4}),
         ) as source_visual:
             result = _materialize_visuals(
@@ -1077,7 +1076,7 @@ class SlideDeckTaskHelperTests(unittest.TestCase):
         }
 
         with patch(
-            "app.modules.slides.tasks._source_visual_data_and_crop",
+            "app.modules.slides.visual_processor._source_visual_data_and_crop",
             return_value=("data:image/jpeg;base64,abc", {"x": 0.1, "y": 0.2, "width": 0.5, "height": 0.4}),
         ) as source_visual:
             result = _materialize_visuals(
