@@ -27,9 +27,6 @@ export function SourceRail({
     <aside className="flex h-full flex-col">
       <div className="mb-6 flex items-center justify-between">
         <h2 className="text-[0.82rem] font-semibold uppercase tracking-[0.12em] text-ink">Sources</h2>
-        <button type="button" className="rounded-sm p-1 text-muted transition hover:text-ink">
-          <PanelLeft className="h-4 w-4" />
-        </button>
       </div>
 
       <button
