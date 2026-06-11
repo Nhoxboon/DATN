@@ -1,11 +1,14 @@
 """Persistent cache registry using Redis."""
 
 import json
+import logging
 from typing import Optional
 from urllib.parse import quote, unquote
 
 from app.db.dependencies import get_redis_client
 
+
+logger = logging.getLogger(__name__)
 
 CACHE_PREFIX = "gemini_cache"
 CACHE_MANIFEST_PREFIX = "gemini_cache_manifest"
@@ -71,7 +74,7 @@ def get_cache_name(cache_key: str) -> Optional[str]:
         cache_name = client.get(_redis_key(cache_key))
         return cache_name.decode() if isinstance(cache_name, bytes) else cache_name
     except Exception as e:
-        print(f"[CACHE] Error getting cache name: {e}")
+        logger.warning("Error getting cache name: %s", e)
         return None
 
 
@@ -80,9 +83,9 @@ def set_cache_name(cache_key: str, cache_name: str, ttl_seconds: int = 86400):
     try:
         client = get_redis_client()
         client.setex(_redis_key(cache_key), ttl_seconds, cache_name)
-        print(f"[CACHE] Saved to Redis: {cache_key} -> {cache_name}")
+        logger.info("Saved Gemini cache pointer to Redis: %s -> %s", cache_key, cache_name)
     except Exception as e:
-        print(f"[CACHE] Error setting cache name: {e}")
+        logger.warning("Error setting cache name: %s", e)
 
 
 def get_cache_manifest(manifest_key: str) -> list[dict] | None:
@@ -96,7 +99,7 @@ def get_cache_manifest(manifest_key: str) -> list[dict] | None:
         data = json.loads(manifest_text)
         return data if isinstance(data, list) else None
     except Exception as e:
-        print(f"[CACHE] Error getting cache manifest: {e}")
+        logger.warning("Error getting cache manifest: %s", e)
         return None
 
 
@@ -105,9 +108,9 @@ def set_cache_manifest(manifest_key: str, sources: list[dict], ttl_seconds: int 
     try:
         client = get_redis_client()
         client.setex(_redis_key(manifest_key), ttl_seconds, json.dumps(sources))
-        print(f"[CACHE] Saved manifest to Redis: {manifest_key}")
+        logger.info("Saved Gemini cache manifest to Redis: %s", manifest_key)
     except Exception as e:
-        print(f"[CACHE] Error setting cache manifest: {e}")
+        logger.warning("Error setting cache manifest: %s", e)
 
 
 def delete_cache_name(cache_key: str) -> bool:
@@ -117,7 +120,7 @@ def delete_cache_name(cache_key: str) -> bool:
         result = client.delete(_redis_key(cache_key))
         return result > 0
     except Exception as e:
-        print(f"[CACHE] Error deleting cache name: {e}")
+        logger.warning("Error deleting cache name: %s", e)
         return False
 
 
@@ -128,7 +131,7 @@ def delete_cache_manifest(manifest_key: str) -> bool:
         result = client.delete(_redis_key(manifest_key))
         return result > 0
     except Exception as e:
-        print(f"[CACHE] Error deleting cache manifest: {e}")
+        logger.warning("Error deleting cache manifest: %s", e)
         return False
 
 
@@ -154,10 +157,15 @@ def invalidate_document_caches(notebook_id: str, document_name: str) -> int:
                 if clean_document_name in doc_names:
                     deleted += int(client.delete(key))
         if deleted:
-            print(f"[CACHE] Invalidated {deleted} cache(s) for notebook={notebook_id} document={document_name}")
+            logger.info(
+                "Invalidated %s Gemini cache key(s) for notebook=%s document=%s",
+                deleted,
+                notebook_id,
+                document_name,
+            )
         return deleted
     except Exception as e:
-        print(f"[CACHE] Error invalidating document caches: {e}")
+        logger.warning("Error invalidating document caches: %s", e)
         return 0
 
 
@@ -175,5 +183,5 @@ def list_all_cached_docs() -> dict:
                 result[key_str] = cache_name_str
         return result
     except Exception as e:
-        print(f"[CACHE] Error listing caches: {e}")
+        logger.warning("Error listing caches: %s", e)
         return {}

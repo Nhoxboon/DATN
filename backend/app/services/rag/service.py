@@ -2,6 +2,7 @@
 
 import dspy
 import dspy.streaming  # type: ignore
+import logging
 import math
 import re
 from pathlib import Path
@@ -19,6 +20,7 @@ from app.services.rag.cache_registry import build_document_cache_key, build_docu
 
 
 CITATION_PATTERN = re.compile(r"\[(\d+(?:\s*,\s*\d+)*)\]")
+logger = logging.getLogger(__name__)
 
 
 def _citation_numbers(match: re.Match[str]) -> list[int]:
@@ -292,12 +294,12 @@ class RAGService:
         scope_token = self.retrieval_service.set_notebook_scope(notebook_id)
         try:
             # Run RAG with doc_ids if provided
-            print("[TIMING] Starting DSPy RAG call...")
+            logger.info("Starting DSPy RAG call.")
             if effective_doc_names is not None:
                 prediction = self.rag(question=question, doc_names=effective_doc_names)
             else:
                 prediction = self.rag(question=question)
-            print(f"[TIMING] DSPy RAG completed in {time.time() - start_time:.2f}s")
+            logger.info("DSPy RAG completed in %.2fs", time.time() - start_time)
         finally:
             self.retrieval_service.reset_notebook_scope(scope_token)
 
@@ -360,11 +362,11 @@ class RAGService:
 
             # Old cache entries created before manifests are unsafe for citation display.
             if cache_name and not source_manifest:
-                print(f"[CACHE] Cache manifest missing for {cache_key}; recreating cache")
+                logger.info("Cache manifest missing for %s; recreating cache", cache_key)
                 self.cache_service.delete_cache(cache_key)
                 cache_name = None
             elif cache_name and source_manifest and not self._manifest_has_chunk_ids(source_manifest):
-                print(f"[CACHE] Cache manifest missing chunk ids for {cache_key}; recreating cache")
+                logger.info("Cache manifest missing chunk ids for %s; recreating cache", cache_key)
                 self.cache_service.delete_cache(cache_key)
                 self.cache_service.delete_cache_manifest(manifest_key)
                 cache_name = None
@@ -372,7 +374,7 @@ class RAGService:
 
             # If cache doesn't exist, create it
             if not cache_name:
-                print(f"[CACHE] Creating cache for documents: {', '.join(effective_doc_names)}")
+                logger.info("Creating Gemini cache for documents: %s", ", ".join(effective_doc_names))
                 start = time.time()
                 # Get ALL chunks from the specified documents (not query-filtered)
                 chunks = await asyncio.to_thread(
@@ -380,7 +382,11 @@ class RAGService:
                     effective_doc_names,
                     notebook_id
                 )
-                print(f"[CACHE] Fetched {len(chunks)} total chunks from {len(effective_doc_names)} document(s)")
+                logger.info(
+                    "Fetched %s total chunks from %s document(s) for cache.",
+                    len(chunks),
+                    len(effective_doc_names),
+                )
                 source_manifest = [
                     self._format_source(chunk)
                     for chunk in chunks
@@ -394,11 +400,11 @@ class RAGService:
                     ttl_hours=1
                 )
                 source_manifest = self.cache_service.get_cache_manifest(manifest_key)
-                print(f"[CACHE] Cache created in {time.time() - start:.2f}s")
+                logger.info("Gemini cache created in %.2fs", time.time() - start)
                 if cache_name and (
                     not source_manifest or not self._manifest_has_chunk_ids(source_manifest)
                 ):
-                    print(f"[CACHE] Cache manifest still missing chunk ids for {cache_key}; skipping cache path")
+                    logger.info("Cache manifest still missing chunk ids for %s; skipping cache path", cache_key)
                     self.cache_service.delete_cache(cache_key)
                     self.cache_service.delete_cache_manifest(manifest_key)
                     cache_name = None
@@ -408,7 +414,7 @@ class RAGService:
             if cache_name and source_manifest:
                 num_docs = len(effective_doc_names)
                 strategy = f"cached-{'single' if num_docs == 1 else 'multi'}-hop"
-                print(f"[CACHE] Using cached context for {num_docs} document(s)")
+                logger.info("Using cached context for %s document(s)", num_docs)
                 try:
                     cached_answer = await asyncio.to_thread(
                         self.cache_service.generate_with_cache,
@@ -450,7 +456,7 @@ class RAGService:
                     self.retrieval_service.reset_notebook_scope(scope_token)
                     return
                 except Exception as e:
-                    print(f"[CACHE] Error using cache, falling back to DSPy: {e}")
+                    logger.info("Error using cache; falling back to DSPy: %s", e)
 
         # Queue to pass chunks from DSPy thread to main async context
         chunk_queue = queue.Queue()

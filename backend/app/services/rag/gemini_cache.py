@@ -1,5 +1,6 @@
 """Gemini context caching for document chunks."""
 
+import logging
 from typing import Optional, List, Dict, Any
 from app.services.rag.cache_registry import (
     delete_cache_manifest as delete_manifest_from_redis,
@@ -11,6 +12,9 @@ from app.services.rag.cache_registry import (
 )
 from google import genai
 from google.genai import types
+
+
+logger = logging.getLogger(__name__)
 
 
 class GeminiCacheService:
@@ -67,7 +71,7 @@ class GeminiCacheService:
 
             # Check minimum token requirement (~1024 tokens = ~750 words = ~4500 chars)
             if len(full_context) < 4000:
-                print(f"[CACHE] Context too small for caching: {len(full_context)} chars")
+                logger.info("Context too small for Gemini caching: %s chars", len(full_context))
                 return None
 
             # Create cache
@@ -94,11 +98,11 @@ class GeminiCacheService:
             if manifest_key and source_manifest:
                 set_manifest_in_redis(manifest_key, source_manifest, ttl_seconds)
 
-            print(f"[CACHE] Created cache for {cache_key}: {cache_name}")
+            logger.info("Created Gemini cache for %s: %s", cache_key, cache_name)
             return cache_name
 
         except Exception as e:
-            print(f"[CACHE] Error creating cache: {e}")
+            logger.warning("Error creating Gemini cache: %s", e)
             return None
 
     def get_cache_name(self, cache_key: str) -> Optional[str]:
@@ -118,11 +122,11 @@ class GeminiCacheService:
         try:
             self.client.caches.delete(name=cache_name)
         except Exception as e:
-            print(f"[CACHE] Error deleting cache: {e}")
+            logger.warning("Error deleting Gemini cache: %s", e)
 
         deleted = delete_cache_from_redis(cache_key)
         if deleted:
-            print(f"[CACHE] Deleted cache for {cache_key}")
+            logger.info("Deleted Gemini cache for %s", cache_key)
         return deleted
 
     def delete_cache_manifest(self, manifest_key: str) -> bool:
@@ -162,7 +166,7 @@ class GeminiCacheService:
             return response.text
 
         except Exception as e:
-            print(f"[CACHE] Error generating with cache: {e}")
+            logger.warning("Error generating with Gemini cache: %s", e)
             raise
 
     async def generate_with_cache_stream(
@@ -205,5 +209,5 @@ class GeminiCacheService:
                     yield chunk.text
 
         except Exception as e:
-            print(f"[CACHE] Error streaming with cache: {e}")
+            logger.warning("Error streaming with Gemini cache: %s", e)
             raise

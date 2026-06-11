@@ -1,0 +1,162 @@
+{
+  "summary": [
+    {
+      "threshold": 0.4,
+      "answer_accuracy": 0.887479,
+      "faithfulness": 1.0,
+      "retrieval_recall": 1.0,
+      "citation_validity": 1.0,
+      "source_count": 3.0,
+      "quality_score": 0.949366
+    },
+    {
+      "threshold": 0.6,
+      "answer_accuracy": 1.0,
+      "faithfulness": 1.0,
+      "retrieval_recall": 1.0,
+      "citation_validity": 1.0,
+      "source_count": 2.0,
+      "quality_score": 1.0
+    },
+    {
+      "threshold": 0.7,
+      "answer_accuracy": 0.756944,
+      "faithfulness": 1.0,
+      "retrieval_recall": 0.666667,
+      "citation_validity": 1.0,
+      "source_count": 1.333333,
+      "quality_score": 0.823958
+    },
+    {
+      "threshold": 0.8,
+      "answer_accuracy": 0.443056,
+      "faithfulness": 0.666667,
+      "retrieval_recall": 0.333333,
+      "citation_validity": 0.666667,
+      "source_count": 0.666667,
+      "quality_score": 0.499375
+    }
+  ],
+  "rows": [
+    {
+      "threshold": 0.4,
+      "case_id": "registration",
+      "answer_accuracy": 0.885294,
+      "faithfulness": 1.0,
+      "retrieval_recall": 1.0,
+      "citation_validity": 1.0,
+      "source_count": 3.0,
+      "answer": "Registration uses Supabase Auth for email and password accounts [1]. The backend validates duplicate emails before creating a user [2]. Slide decks are rendered to PDF by the browser renderer [3]."
+    },
+    {
+      "threshold": 0.4,
+      "case_id": "pdf_pages",
+      "answer_accuracy": 0.87,
+      "faithfulness": 1.0,
+      "retrieval_recall": 1.0,
+      "citation_validity": 1.0,
+      "source_count": 3.0,
+      "answer": "PDF chunks preserve marker page boundaries [1]. When markers are missing, pages are distributed across the text [2]. Audio overviews use Gemini text to speech [3]."
+    },
+    {
+      "threshold": 0.4,
+      "case_id": "cached_citations",
+      "answer_accuracy": 0.907143,
+      "faithfulness": 1.0,
+      "retrieval_recall": 1.0,
+      "citation_validity": 1.0,
+      "source_count": 3.0,
+      "answer": "Cached RAG answers must resolve citations against the source manifest [1]. The service refreshes similarity scores for cited chunks [2]. Notebook notes save an answer in Studio [3]."
+    },
+    {
+      "threshold": 0.6,
+      "case_id": "registration",
+      "answer_accuracy": 1.0,
+      "faithfulness": 1.0,
+      "retrieval_recall": 1.0,
+      "citation_validity": 1.0,
+      "source_count": 2.0,
+      "answer": "Registration uses Supabase Auth for email and password accounts [1]. The backend validates duplicate emails before creating a user [2]."
+    },
+    {
+      "threshold": 0.6,
+      "case_id": "pdf_pages",
+      "answer_accuracy": 1.0,
+      "faithfulness": 1.0,
+      "retrieval_recall": 1.0,
+      "citation_validity": 1.0,
+      "source_count": 2.0,
+      "answer": "PDF chunks preserve marker page boundaries [1]. When markers are missing, pages are distributed across the text [2]."
+    },
+    {
+      "threshold": 0.6,
+      "case_id": "cached_citations",
+      "answer_accuracy": 1.0,
+      "faithfulness": 1.0,
+      "retrieval_recall": 1.0,
+      "citation_validity": 1.0,
+      "source_count": 2.0,
+      "answer": "Cached RAG answers must resolve citations against the source manifest [1]. The service refreshes similarity scores for cited chunks [2]."
+    },
+    {
+      "threshold": 0.7,
+      "case_id": "registration",
+      "answer_accuracy": 1.0,
+      "faithfulness": 1.0,
+      "retrieval_recall": 1.0,
+      "citation_validity": 1.0,
+      "source_count": 2.0,
+      "answer": "Registration uses Supabase Auth for email and password accounts [1]. The backend validates duplicate emails before creating a user [2]."
+    },
+    {
+      "threshold": 0.7,
+      "case_id": "pdf_pages",
+      "answer_accuracy": 0.608333,
+      "faithfulness": 1.0,
+      "retrieval_recall": 0.5,
+      "citation_validity": 1.0,
+      "source_count": 1.0,
+      "answer": "PDF chunks preserve marker page boundaries [1]."
+    },
+    {
+      "threshold": 0.7,
+      "case_id": "cached_citations",
+      "answer_accuracy": 0.6625,
+      "faithfulness": 1.0,
+      "retrieval_recall": 0.5,
+      "citation_validity": 1.0,
+      "source_count": 1.0,
+      "answer": "Cached RAG answers must resolve citations against the source manifest [1]."
+    },
+    {
+      "threshold": 0.8,
+      "case_id": "registration",
+      "answer_accuracy": 0.666667,
+      "faithfulness": 1.0,
+      "retrieval_recall": 0.5,
+      "citation_validity": 1.0,
+      "source_count": 1.0,
+      "answer": "Registration uses Supabase Auth for email and password accounts [1]."
+    },
+    {
+      "threshold": 0.8,
+      "case_id": "pdf_pages",
+      "answer_accuracy": 0.0,
+      "faithfulness": 0.0,
+      "retrieval_recall": 0.0,
+      "citation_validity": 0.0,
+      "source_count": 0.0,
+      "answer": "Not enough evidence in the retrieved context."
+    },
+    {
+      "threshold": 0.8,
+      "case_id": "cached_citations",
+      "answer_accuracy": 0.6625,
+      "faithfulness": 1.0,
+      "retrieval_recall": 0.5,
+      "citation_validity": 1.0,
+      "source_count": 1.0,
+      "answer": "Cached RAG answers must resolve citations against the source manifest [1]."
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 """Repository for document processing status tracking."""
 
 from typing import Optional
-from datetime import datetime
+from datetime import UTC, datetime
 from supabase import Client
 
 
@@ -24,6 +24,10 @@ class ProcessingStatusRepository:
             client: Supabase client instance
         """
         self.client = client
+
+    @staticmethod
+    def _utc_now_iso() -> str:
+        return datetime.now(UTC).isoformat()
 
     def create_status(
         self,
@@ -54,8 +58,8 @@ class ProcessingStatusRepository:
             "processed_chunks": 0,
             "error_message": None,
             "completed_at": None,
-            "created_at": datetime.utcnow().isoformat(),
-            "updated_at": datetime.utcnow().isoformat()
+            "created_at": self._utc_now_iso(),
+            "updated_at": self._utc_now_iso()
         }
 
         result = self.client.table("document_processing_status")\
@@ -86,7 +90,7 @@ class ProcessingStatusRepository:
         """
         update_data = {
             "status": status,
-            "updated_at": datetime.utcnow().isoformat()
+            "updated_at": self._utc_now_iso()
         }
 
         if processed_chunks is not None:
@@ -99,7 +103,7 @@ class ProcessingStatusRepository:
             update_data["error_message"] = error_message
 
         if status == ProcessingStatus.COMPLETED:
-            update_data["completed_at"] = datetime.utcnow().isoformat()
+            update_data["completed_at"] = self._utc_now_iso()
 
         result = self.client.table("document_processing_status")\
             .update(update_data)\

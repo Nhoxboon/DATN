@@ -1,0 +1,827 @@
+{
+  "summary": [
+    {
+      "strategy": "naive",
+      "display_name": "Naive RAG",
+      "stage1_scan_chunks": 0,
+      "selected_documents": 33,
+      "search_calls": 33,
+      "rerank_candidates": 330,
+      "oracle_source_recall": 1.0,
+      "estimated_latency_ms": 1340.0,
+      "rerank_reduction": 0.0,
+      "estimated_speedup": 1.0
+    },
+    {
+      "strategy": "two_stage",
+      "display_name": "Two-stage + Reranking",
+      "stage1_scan_chunks": 66,
+      "selected_documents": 5,
+      "search_calls": 38,
+      "rerank_candidates": 40,
+      "oracle_source_recall": 1.0,
+      "estimated_latency_ms": 183.3,
+      "rerank_reduction": 0.878788,
+      "estimated_speedup": 7.31042
+    }
+  ],
+  "details": {
+    "benchmark_type": "synthetic oracle retrieval workload benchmark",
+    "accuracy_note": "This benchmark does not measure real DSPy/LLM answer accuracy. It measures whether both retrieval strategies keep the labeled source chunks.",
+    "doc_count": 33,
+    "naive_formula": "33 documents * 10 chunks/document",
+    "two_stage_formula": "stage1=33*2; stage2=5*8",
+    "expected_sources": [
+      "doc-01#1",
+      "doc-02#1",
+      "doc-03#1",
+      "doc-04#1",
+      "doc-05#1"
+    ],
+    "naive_search_calls": [
+      {
+        "document_name": "doc-01",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-02",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-03",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-04",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-05",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-06",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-07",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-08",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-09",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-10",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-11",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-12",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-13",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-14",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-15",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-16",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-17",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-18",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-19",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-20",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-21",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-22",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-23",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-24",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-25",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-26",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-27",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-28",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-29",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-30",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-31",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-32",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-33",
+        "doc_names": null,
+        "limit": 10,
+        "returned": 10,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      }
+    ],
+    "two_stage_search_calls": [
+      {
+        "document_name": "doc-01",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-02",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-03",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-04",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-05",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-06",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-07",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-08",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-09",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-10",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-11",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-12",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-13",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-14",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-15",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-16",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-17",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-18",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-19",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-20",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-21",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-22",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-23",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-24",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-25",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-26",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-27",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-28",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-29",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-30",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-31",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-32",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-33",
+        "doc_names": null,
+        "limit": 2,
+        "returned": 2,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-01",
+        "doc_names": null,
+        "limit": 8,
+        "returned": 8,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-02",
+        "doc_names": null,
+        "limit": 8,
+        "returned": 8,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-03",
+        "doc_names": null,
+        "limit": 8,
+        "returned": 8,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-04",
+        "doc_names": null,
+        "limit": 8,
+        "returned": 8,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      },
+      {
+        "document_name": "doc-05",
+        "doc_names": null,
+        "limit": 8,
+        "returned": 8,
+        "notebook_id": "notebook-benchmark",
+        "query_embedding": [
+          0.1,
+          0.2
+        ]
+      }
+    ]
+  }
+}

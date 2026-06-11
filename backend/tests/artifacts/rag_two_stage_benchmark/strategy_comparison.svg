@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="470" viewBox="0 0 900 470">
+<rect width="100%" height="100%" fill="white"/>
+<text x="70" y="32" font-family="Arial" font-size="19" font-weight="700">Naive RAG vs Two-stage + Reranking</text>
+<line x1="80" y1="300" x2="860" y2="300" stroke="#111827"/>
+<line x1="80" y1="60" x2="80" y2="300" stroke="#111827"/>
+<rect x="190" y="80.0" width="150" height="220.0" fill="#dc2626"><title>Naive RAG: 330 rerank candidates</title></rect>
+<text x="265" y="324" text-anchor="middle" font-family="Arial" font-size="13">Naive RAG</text>
+<text x="265" y="70.0" text-anchor="middle" font-family="Arial" font-size="16" font-weight="700">330</text>
+<text x="265" y="344" text-anchor="middle" font-family="Arial" font-size="12">Oracle source recall: 100%</text>
+<text x="265" y="362" text-anchor="middle" font-family="Arial" font-size="12">Latency est.: 1340.0 ms</text>
+<rect x="480" y="273.3" width="150" height="26.7" fill="#16a34a"><title>Two-stage + Reranking: 40 rerank candidates</title></rect>
+<text x="555" y="324" text-anchor="middle" font-family="Arial" font-size="13">Two-stage + Reranking</text>
+<text x="555" y="263.3" text-anchor="middle" font-family="Arial" font-size="16" font-weight="700">40</text>
+<text x="555" y="344" text-anchor="middle" font-family="Arial" font-size="12">Oracle source recall: 100%</text>
+<text x="555" y="362" text-anchor="middle" font-family="Arial" font-size="12">Latency est.: 183.3 ms</text>
+<text x="70" y="390" font-family="Arial" font-size="14">Naive workload: 33 docs x 10 chunks = 330 Cross-Encoder pairs</text>
+<text x="70" y="414" font-family="Arial" font-size="14">Two-stage workload: 5 docs x 8 chunks = 40 Cross-Encoder pairs</text>
+<text x="70" y="438" font-family="Arial" font-size="15" font-weight="700">87.88% less Cross-Encoder work; oracle source recall remains 100% in this synthetic benchmark</text>
+</svg>

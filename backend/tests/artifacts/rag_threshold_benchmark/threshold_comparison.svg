@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="520" viewBox="0 0 960 520">
+<rect width="100%" height="100%" fill="white"/>
+<text x="72" y="28" font-family="Arial" font-size="18" font-weight="700">RAG threshold comparison</text>
+<line x1="72" y1="400.0" x2="928" y2="400.0" stroke="#e5e7eb"/>
+<text x="60" y="404.0" text-anchor="end" font-family="Arial" font-size="12">0.0</text>
+<line x1="72" y1="329.6" x2="928" y2="329.6" stroke="#e5e7eb"/>
+<text x="60" y="333.6" text-anchor="end" font-family="Arial" font-size="12">0.2</text>
+<line x1="72" y1="259.2" x2="928" y2="259.2" stroke="#e5e7eb"/>
+<text x="60" y="263.2" text-anchor="end" font-family="Arial" font-size="12">0.4</text>
+<line x1="72" y1="188.8" x2="928" y2="188.8" stroke="#e5e7eb"/>
+<text x="60" y="192.8" text-anchor="end" font-family="Arial" font-size="12">0.6</text>
+<line x1="72" y1="118.4" x2="928" y2="118.4" stroke="#e5e7eb"/>
+<text x="60" y="122.4" text-anchor="end" font-family="Arial" font-size="12">0.8</text>
+<line x1="72" y1="48.0" x2="928" y2="48.0" stroke="#e5e7eb"/>
+<text x="60" y="52.0" text-anchor="end" font-family="Arial" font-size="12">1.0</text>
+<line x1="72" y1="48" x2="72" y2="400" stroke="#111827"/>
+<line x1="72" y1="400" x2="928" y2="400" stroke="#111827"/>
+<text x="179.0" y="424" text-anchor="middle" font-family="Arial" font-size="12">0.4</text>
+<rect x="123.0" y="87.6" width="25.0" height="312.4" fill="#2563eb"><title>answer_accuracy @ 0.4: 0.887</title></rect>
+<rect x="151.0" y="48.0" width="25.0" height="352.0" fill="#16a34a"><title>faithfulness @ 0.4: 1.000</title></rect>
+<rect x="179.0" y="48.0" width="25.0" height="352.0" fill="#d97706"><title>retrieval_recall @ 0.4: 1.000</title></rect>
+<rect x="207.0" y="48.0" width="25.0" height="352.0" fill="#9333ea"><title>citation_validity @ 0.4: 1.000</title></rect>
+<text x="393.0" y="424" text-anchor="middle" font-family="Arial" font-size="12">0.6</text>
+<rect x="337.0" y="48.0" width="25.0" height="352.0" fill="#2563eb"><title>answer_accuracy @ 0.6: 1.000</title></rect>
+<rect x="365.0" y="48.0" width="25.0" height="352.0" fill="#16a34a"><title>faithfulness @ 0.6: 1.000</title></rect>
+<rect x="393.0" y="48.0" width="25.0" height="352.0" fill="#d97706"><title>retrieval_recall @ 0.6: 1.000</title></rect>
+<rect x="421.0" y="48.0" width="25.0" height="352.0" fill="#9333ea"><title>citation_validity @ 0.6: 1.000</title></rect>
+<text x="607.0" y="424" text-anchor="middle" font-family="Arial" font-size="12">0.7</text>
+<rect x="551.0" y="133.6" width="25.0" height="266.4" fill="#2563eb"><title>answer_accuracy @ 0.7: 0.757</title></rect>
+<rect x="579.0" y="48.0" width="25.0" height="352.0" fill="#16a34a"><title>faithfulness @ 0.7: 1.000</title></rect>
+<rect x="607.0" y="165.3" width="25.0" height="234.7" fill="#d97706"><title>retrieval_recall @ 0.7: 0.667</title></rect>
+<rect x="635.0" y="48.0" width="25.0" height="352.0" fill="#9333ea"><title>citation_validity @ 0.7: 1.000</title></rect>
+<text x="821.0" y="424" text-anchor="middle" font-family="Arial" font-size="12">0.8</text>
+<rect x="765.0" y="244.0" width="25.0" height="156.0" fill="#2563eb"><title>answer_accuracy @ 0.8: 0.443</title></rect>
+<rect x="793.0" y="165.3" width="25.0" height="234.7" fill="#16a34a"><title>faithfulness @ 0.8: 0.667</title></rect>
+<rect x="821.0" y="282.7" width="25.0" height="117.3" fill="#d97706"><title>retrieval_recall @ 0.8: 0.333</title></rect>
+<rect x="849.0" y="165.3" width="25.0" height="234.7" fill="#9333ea"><title>citation_validity @ 0.8: 0.667</title></rect>
+<rect x="72" y="452" width="12" height="12" fill="#2563eb"/>
+<text x="90" y="462" font-family="Arial" font-size="12">answer_accuracy</text>
+<rect x="277" y="452" width="12" height="12" fill="#16a34a"/>
+<text x="295" y="462" font-family="Arial" font-size="12">faithfulness</text>
+<rect x="482" y="452" width="12" height="12" fill="#d97706"/>
+<text x="500" y="462" font-family="Arial" font-size="12">retrieval_recall</text>
+<rect x="687" y="452" width="12" height="12" fill="#9333ea"/>
+<text x="705" y="462" font-family="Arial" font-size="12">citation_validity</text>
+</svg>

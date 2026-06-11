@@ -52,12 +52,12 @@ def _render_deck_pdf_for_config(deck: dict[str, Any], pdf_path: Path, slide_conf
             return "browser"
         except Exception as exc:
             last_error = exc
-            logger.warning(
+            logger.info(
                 "Browser slide PDF render failed attempt=%s/%s error=%s",
                 attempt + 1,
                 max_retries + 1,
                 exc,
-                exc_info=True,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
             )
 
     if fallback == "pillow":

@@ -205,6 +205,8 @@ class NotebookWorkspaceService:
                 "public_url": None,
                 "queued": True,
             }
+        except NotebookValidationError:
+            raise
         except Exception as exc:
             logger.exception(
                 "Notebook document upload failed notebook_id=%s user_id=%s document=%s",

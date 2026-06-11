@@ -1,0 +1,5 @@
+threshold,answer_accuracy,faithfulness,retrieval_recall,citation_validity,source_count,quality_score
+0.4,0.887479,1.0,1.0,1.0,3.0,0.949366
+0.6,1.0,1.0,1.0,1.0,2.0,1.0
+0.7,0.756944,1.0,0.666667,1.0,1.333333,0.823958
+0.8,0.443056,0.666667,0.333333,0.666667,0.666667,0.499375
