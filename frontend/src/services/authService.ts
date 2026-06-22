@@ -136,6 +136,17 @@ export const authService = {
   },
 
   async requestPasswordReset(email: string) {
+    const checkResponse = await fetch(`${backendUrl()}/auth/check-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+
+    if (!checkResponse.ok) {
+      const errorData = (await checkResponse.json().catch(() => ({}))) as { detail?: string }
+      throw new Error(errorData.detail || 'Tài khoản không tồn tại')
+    }
+
     const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${appUrl()}/reset-password`,
     })

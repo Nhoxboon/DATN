@@ -3,6 +3,7 @@
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, EmailStr
 
 from app.db.dependencies import get_supabase_admin_client, get_supabase_anon_client
 from app.schemas.auth import CurrentUser, SignUpRequest, SignUpResponse
@@ -11,6 +12,29 @@ from app.services.auth.registration import sign_up_with_email, user_exists_by_em
 
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+class CheckEmailRequest(BaseModel):
+    """Request body for the email-existence check."""
+
+    email: EmailStr
+
+
+@router.post("/check-email")
+async def check_email(
+    payload: CheckEmailRequest,
+    admin_client: Any = Depends(get_supabase_admin_client),
+) -> dict[str, bool]:
+    """Return 404 when the email is not registered."""
+    email = payload.email.strip().lower()
+
+    if not user_exists_by_email(admin_client, email):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tài khoản không tồn tại",
+        )
+
+    return {"exists": True}
 
 
 @router.get("/me", response_model=CurrentUser)
