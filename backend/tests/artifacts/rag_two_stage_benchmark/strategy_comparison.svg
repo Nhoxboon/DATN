@@ -1,19 +1,35 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="900" height="470" viewBox="0 0 900 470">
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="520" viewBox="0 0 1080 520">
 <rect width="100%" height="100%" fill="white"/>
-<text x="70" y="32" font-family="Arial" font-size="19" font-weight="700">Naive RAG vs Two-stage + Reranking</text>
-<line x1="80" y1="300" x2="860" y2="300" stroke="#111827"/>
-<line x1="80" y1="60" x2="80" y2="300" stroke="#111827"/>
-<rect x="190" y="80.0" width="150" height="220.0" fill="#dc2626"><title>Naive RAG: 330 rerank candidates</title></rect>
-<text x="265" y="324" text-anchor="middle" font-family="Arial" font-size="13">Naive RAG</text>
-<text x="265" y="70.0" text-anchor="middle" font-family="Arial" font-size="16" font-weight="700">330</text>
-<text x="265" y="344" text-anchor="middle" font-family="Arial" font-size="12">Oracle source recall: 100%</text>
-<text x="265" y="362" text-anchor="middle" font-family="Arial" font-size="12">Latency est.: 1340.0 ms</text>
-<rect x="480" y="273.3" width="150" height="26.7" fill="#16a34a"><title>Two-stage + Reranking: 40 rerank candidates</title></rect>
-<text x="555" y="324" text-anchor="middle" font-family="Arial" font-size="13">Two-stage + Reranking</text>
-<text x="555" y="263.3" text-anchor="middle" font-family="Arial" font-size="16" font-weight="700">40</text>
-<text x="555" y="344" text-anchor="middle" font-family="Arial" font-size="12">Oracle source recall: 100%</text>
-<text x="555" y="362" text-anchor="middle" font-family="Arial" font-size="12">Latency est.: 183.3 ms</text>
-<text x="70" y="390" font-family="Arial" font-size="14">Naive workload: 33 docs x 10 chunks = 330 Cross-Encoder pairs</text>
-<text x="70" y="414" font-family="Arial" font-size="14">Two-stage workload: 5 docs x 8 chunks = 40 Cross-Encoder pairs</text>
-<text x="70" y="438" font-family="Arial" font-size="15" font-weight="700">87.88% less Cross-Encoder work; oracle source recall remains 100% in this synthetic benchmark</text>
+<text x="70" y="32" font-family="Arial" font-size="19" font-weight="700">RAG Strategy Quality vs Latency</text>
+<text x="70" y="54" font-family="Arial" font-size="13" fill="#475569">synthetic benchmark: higher recall is better; lower latency is faster</text>
+<line x1="80" y1="330" x2="1040" y2="330" stroke="#111827"/>
+<line x1="80" y1="64" x2="80" y2="330" stroke="#111827"/>
+<rect x="155" y="110.0" width="72" height="220.0" fill="#f59e0b"><title>Naive RAG: Oracle source recall 100%</title></rect>
+<text x="191" y="102.0" text-anchor="middle" font-family="Arial" font-size="14" font-weight="700">100%</text>
+<rect x="247" y="110.0" width="72" height="220.0" fill="#2563eb"><title>Naive RAG: Latency est. 1340.0 ms</title></rect>
+<text x="283" y="102.0" text-anchor="middle" font-family="Arial" font-size="14" font-weight="700">1340.0 ms</text>
+<text x="237" y="354" text-anchor="middle" font-family="Arial" font-size="13">Naive RAG</text>
+<text x="237" y="374" text-anchor="middle" font-family="Arial" font-size="12">Recall: 100%</text>
+<text x="237" y="392" text-anchor="middle" font-family="Arial" font-size="12">Latency est.: 1340.0 ms</text>
+<rect x="440" y="110.0" width="72" height="220.0" fill="#f59e0b"><title>Two-stage + Reranking: Oracle source recall 100%</title></rect>
+<text x="476" y="102.0" text-anchor="middle" font-family="Arial" font-size="14" font-weight="700">100%</text>
+<rect x="532" y="299.9" width="72" height="30.1" fill="#2563eb"><title>Two-stage + Reranking: Latency est. 183.3 ms</title></rect>
+<text x="568" y="291.9" text-anchor="middle" font-family="Arial" font-size="14" font-weight="700">183.3 ms</text>
+<text x="522" y="354" text-anchor="middle" font-family="Arial" font-size="13">Two-stage + Reranking</text>
+<text x="522" y="374" text-anchor="middle" font-family="Arial" font-size="12">Recall: 100%</text>
+<text x="522" y="392" text-anchor="middle" font-family="Arial" font-size="12">Latency est.: 183.3 ms</text>
+<rect x="725" y="154.0" width="72" height="176.0" fill="#f59e0b"><title>Two-stage only: Oracle source recall 80%</title></rect>
+<text x="761" y="146.0" text-anchor="middle" font-family="Arial" font-size="14" font-weight="700">80%</text>
+<rect x="817" y="326.2" width="72" height="3.8" fill="#2563eb"><title>Two-stage only: Latency est. 23.3 ms</title></rect>
+<text x="853" y="318.2" text-anchor="middle" font-family="Arial" font-size="14" font-weight="700">23.3 ms</text>
+<text x="807" y="354" text-anchor="middle" font-family="Arial" font-size="13">Two-stage only</text>
+<text x="807" y="374" text-anchor="middle" font-family="Arial" font-size="12">Recall: 80%</text>
+<text x="807" y="392" text-anchor="middle" font-family="Arial" font-size="12">Latency est.: 23.3 ms</text>
+<rect x="80" y="420" width="14" height="14" fill="#f59e0b"/>
+<text x="102" y="432" font-family="Arial" font-size="13">Oracle source recall</text>
+<rect x="270" y="420" width="14" height="14" fill="#2563eb"/>
+<text x="292" y="432" font-family="Arial" font-size="13">Latency est. (ms)</text>
+<text x="70" y="468" font-family="Arial" font-size="14">All strategies start from the same 33-document corpus.</text>
+<text x="70" y="492" font-family="Arial" font-size="14">Two-stage + rerank keeps 100% recall at 183.3 ms vs Naive at 1340.0 ms.</text>
+<text x="70" y="516" font-family="Arial" font-size="14">Two-stage only is fastest at 23.3 ms, with 80% recall in this synthetic benchmark.</text>
 </svg>

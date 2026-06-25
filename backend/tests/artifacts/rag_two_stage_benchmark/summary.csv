@@ -1,3 +1,4 @@
-strategy,display_name,stage1_scan_chunks,selected_documents,search_calls,rerank_candidates,oracle_source_recall,estimated_latency_ms,rerank_reduction,estimated_speedup
-naive,Naive RAG,0,33,33,330,1.0,1340.0,0.0,1.0
-two_stage,Two-stage + Reranking,66,5,38,40,1.0,183.3,0.878788,7.31042
+strategy,display_name,documents_scanned,stage1_scan_chunks,selected_documents,search_calls,candidate_chunks,final_candidate_chunks,rerank_candidates,oracle_source_recall,estimated_latency_ms,rerank_reduction,estimated_speedup
+naive,Naive RAG,33,0,33,33,330,330,330,1.0,1340.0,0.0,1.0
+two_stage,Two-stage + Reranking,33,66,5,38,330,40,40,1.0,183.3,0.878788,7.31042
+two_stage_only,Two-stage only,33,66,5,38,330,40,0,0.8,23.3,1.0,57.51073
